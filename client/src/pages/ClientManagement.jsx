@@ -20,7 +20,7 @@ const ClientManagement = () => {
   const fetchClients = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/users?role=client', {
+      const res = await axios.get('/api/users?role=client', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setClients(res.data);
@@ -43,7 +43,7 @@ const ClientManagement = () => {
         email: formData.email.toLowerCase(),
         role: 'client'
       };
-      await axios.post('http://localhost:5000/api/users', payload, {
+      await axios.post('/api/users', payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setFormData({ name: '', email: '', phone: '' });
@@ -57,7 +57,7 @@ const ClientManagement = () => {
     if (!window.confirm('Are you sure? This will delete their referrals too.')) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/users/${id}`, {
+      await axios.delete(`/api/users/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchClients();

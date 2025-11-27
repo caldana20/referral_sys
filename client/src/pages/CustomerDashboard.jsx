@@ -26,7 +26,7 @@ const CustomerDashboard = () => {
         ...formData,
         email: formData.email.toLowerCase()
       };
-      const res = await axios.post('http://localhost:5000/api/referrals', payload);
+      const res = await axios.post('/api/referrals', payload);
       const { code } = res.data;
       setGeneratedLink(`${window.location.origin}/referral/${code}`);
       setStep(2);

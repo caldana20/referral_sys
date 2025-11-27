@@ -15,7 +15,7 @@ const AdminDashboard = () => {
   const fetchReferrals = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/referrals', {
+      const res = await axios.get('/api/referrals', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setReferrals(res.data);
@@ -27,7 +27,7 @@ const AdminDashboard = () => {
   const updateStatus = async (id, status) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.patch(`http://localhost:5000/api/referrals/${id}/status`, 
+      await axios.patch(`/api/referrals/${id}/status`, 
         { status },
         { headers: { Authorization: `Bearer ${token}` } }
       );

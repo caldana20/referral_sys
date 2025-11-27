@@ -20,7 +20,7 @@ const ReferralLanding = () => {
   useEffect(() => {
     const checkCode = async () => {
       try {
-        await axios.get(`http://localhost:5000/api/referrals/code/${code}`);
+        await axios.get(`/api/referrals/code/${code}`);
         setValid(true);
       } catch (err) {
         setValid(false);
@@ -38,7 +38,7 @@ const ReferralLanding = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/estimates', {
+      await axios.post('/api/estimates', {
         referralCode: code,
         ...formData
       });

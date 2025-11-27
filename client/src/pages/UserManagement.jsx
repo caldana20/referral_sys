@@ -23,7 +23,7 @@ const UserManagement = () => {
     try {
       const token = localStorage.getItem('token');
       // Only fetch admins
-      const res = await axios.get('http://localhost:5000/api/users?role=admin', {
+      const res = await axios.get('/api/users?role=admin', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUsers(res.data);
@@ -41,7 +41,7 @@ const UserManagement = () => {
     setError('');
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:5000/api/users', formData, {
+      await axios.post('/api/users', formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setFormData({ name: '', email: '', password: '', role: 'admin', phone: '' });
@@ -55,7 +55,7 @@ const UserManagement = () => {
     if (!window.confirm('Are you sure you want to delete this admin?')) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/users/${id}`, {
+      await axios.delete(`/api/users/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchUsers();
