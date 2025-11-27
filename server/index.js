@@ -1,0 +1,64 @@
+const express = require('express');
+const cors = require('cors');
+const db = require('./models');
+const authRoutes = require('./routes/authRoutes');
+const referralRoutes = require('./routes/referralRoutes');
+const estimateRoutes = require('./routes/estimateRoutes');
+const userRoutes = require('./routes/userRoutes');
+const bcrypt = require('bcryptjs');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(cors());
+app.use(express.json());
+
+app.use('/api/auth', authRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/estimates', estimateRoutes);
+app.use('/api/users', userRoutes);
+
+// Basic route
+app.get('/', (req, res) => {
+  res.send('Referral System API');
+});
+
+const seedDatabase = async () => {
+  try {
+    const adminCount = await db.User.count({ where: { role: 'admin' } });
+    if (adminCount === 0) {
+      const passwordHash = await bcrypt.hash('admin123', 10);
+      await db.User.create({
+        name: 'Admin User',
+        email: 'admin@example.com',
+        password_hash: passwordHash,
+        role: 'admin'
+      });
+      console.log('Default admin created: admin@example.com / admin123');
+    }
+
+    const clientCount = await db.User.count({ where: { role: 'client' } });
+    if (clientCount === 0) {
+      await db.User.create({
+        name: 'John Doe',
+        email: 'client@example.com',
+        role: 'client'
+      });
+      console.log('Default client created: client@example.com');
+    }
+  } catch (error) {
+    console.error('Seeding error:', error);
+  }
+};
+
+db.sequelize.sync().then(async () => {
+  console.log('Database synced');
+  await seedDatabase();
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}).catch(err => {
+  console.error('Failed to sync db:', err);
+});
+
