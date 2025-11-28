@@ -6,6 +6,7 @@ const ReferralLanding = () => {
   const { code } = useParams();
   const [valid, setValid] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [used, setUsed] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -20,8 +21,11 @@ const ReferralLanding = () => {
   useEffect(() => {
     const checkCode = async () => {
       try {
-        await axios.get(`/api/referrals/code/${code}`);
+        const res = await axios.get(`/api/referrals/code/${code}`);
         setValid(true);
+        if (res.data.used) {
+          setUsed(true);
+        }
       } catch (err) {
         setValid(false);
       } finally {
@@ -44,12 +48,26 @@ const ReferralLanding = () => {
       });
       setSubmitted(true);
     } catch (err) {
-      setError('Failed to submit estimate. Please try again.');
+      if (err.response && err.response.status === 400 && err.response.data.message === 'This referral link has already been used') {
+        setUsed(true);
+      }
+      setError(err.response?.data?.message || 'Failed to submit estimate. Please try again.');
     }
   };
 
   if (loading) return <div className="text-center p-10">Loading...</div>;
   if (valid === false) return <div className="text-center p-10 text-red-600 text-xl">Invalid or expired referral link.</div>;
+
+  if (used) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="bg-white p-8 rounded shadow text-center max-w-md">
+                <h2 className="text-2xl font-bold text-red-600 mb-4">Referral Link Used</h2>
+                <p>This referral link has already been used to request an estimate.</p>
+            </div>
+        </div>
+    );
+  }
 
   if (submitted) {
     return (

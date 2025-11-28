@@ -77,10 +77,16 @@ exports.updateReferralStatus = async (req, res) => {
 exports.getReferralByCode = async (req, res) => {
   const { code } = req.params;
   try {
-    const referral = await Referral.findOne({ where: { code } });
+    const referral = await Referral.findOne({ 
+      where: { code },
+      include: [{ model: Estimate }]
+    });
     if (!referral) return res.status(404).json({ message: 'Invalid referral code' });
     
-    res.json(referral);
+    const referralData = referral.toJSON();
+    referralData.used = referral.Estimates && referral.Estimates.length > 0;
+
+    res.json(referralData);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
