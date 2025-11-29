@@ -5,8 +5,15 @@ const authRoutes = require('./routes/authRoutes');
 const referralRoutes = require('./routes/referralRoutes');
 const estimateRoutes = require('./routes/estimateRoutes');
 const userRoutes = require('./routes/userRoutes');
+const rewardRoutes = require('./routes/rewardRoutes');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
 require('dotenv').config();
+
+// Ensure uploads directory exists
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/estimates', estimateRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/rewards', rewardRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

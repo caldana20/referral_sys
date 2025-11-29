@@ -32,11 +32,11 @@ const Referral = sequelize.define('Referral', {
     allowNull: true
   },
   selectedReward: {
-    type: DataTypes.ENUM('service discount', 'free laundry', 'pest treatment'),
+    type: DataTypes.STRING, // Changed from ENUM to support dynamic rewards
     allowNull: false
   },
   status: {
-    type: DataTypes.ENUM('Open', 'Wait', 'Closed', 'Expired'),
+    type: DataTypes.ENUM('Open', 'Wait', 'Closed', 'Expired', 'Used'),
     defaultValue: 'Open'
   }
 });

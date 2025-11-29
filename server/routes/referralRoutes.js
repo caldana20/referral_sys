@@ -5,6 +5,7 @@ const { authenticateToken, requireAdmin } = require('../middleware/authMiddlewar
 
 router.post('/', referralController.createReferral);
 router.get('/', authenticateToken, requireAdmin, referralController.getReferrals);
+router.post('/bulk-delete', authenticateToken, requireAdmin, referralController.bulkDeleteReferrals);
 router.patch('/:id/status', authenticateToken, requireAdmin, referralController.updateReferralStatus);
 router.get('/code/:code', referralController.getReferralByCode);
 

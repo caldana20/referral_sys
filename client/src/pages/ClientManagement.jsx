@@ -11,6 +11,9 @@ const ClientManagement = () => {
     phone: ''
   });
   const [error, setError] = useState('');
+  const [importFile, setImportFile] = useState(null);
+  const [importMsg, setImportMsg] = useState('');
+
   const { logout } = useAuth();
 
   useEffect(() => {
@@ -23,9 +26,38 @@ const ClientManagement = () => {
       const res = await axios.get('/api/users?role=client', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setClients(res.data);
+      setClients(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error('Error fetching clients', error);
+      setClients([]);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    setImportFile(e.target.files[0]);
+  };
+
+  const handleImport = async (e) => {
+    e.preventDefault();
+    if (!importFile) return;
+
+    const formData = new FormData();
+    formData.append('file', importFile);
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post('/api/users/import', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      setImportMsg(`Successfully imported ${res.data.importedCount} clients. Skipped/Error: ${res.data.errors.length}`);
+      setImportFile(null);
+      // Reset file input manually if needed, but simple state reset is fine for now
+      fetchClients();
+    } catch (err) {
+      setImportMsg(err.response?.data?.message || 'Error importing file');
     }
   };
 
@@ -90,6 +122,31 @@ const ClientManagement = () => {
                 <button type="submit" className="bg-green-600 text-white p-2 rounded hover:bg-green-700 col-span-1 md:col-span-3">Add Client</button>
             </form>
             {error && <p className="text-red-500 mt-2">{error}</p>}
+        </div>
+
+        <div className="bg-white p-6 rounded shadow mb-8 border-l-4 border-blue-500">
+            <h3 className="text-lg font-semibold mb-4">Bulk Import Clients (CSV)</h3>
+            <p className="text-sm text-gray-600 mb-4">Upload a CSV file with headers: <strong>Name, Email, Phone</strong></p>
+            <form onSubmit={handleImport} className="flex flex-col md:flex-row gap-4 items-center">
+                <input 
+                    type="file" 
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="border p-2 rounded w-full md:w-auto"
+                />
+                <button 
+                    type="submit" 
+                    disabled={!importFile}
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                    Upload CSV
+                </button>
+            </form>
+            {importMsg && (
+                <div className={`mt-3 p-2 rounded text-sm ${importMsg.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                    {importMsg}
+                </div>
+            )}
         </div>
 
         <div className="bg-white rounded shadow overflow-x-auto">
