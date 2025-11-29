@@ -26,9 +26,10 @@ const UserManagement = () => {
       const res = await axios.get('/api/users?role=admin', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setUsers(res.data);
+      setUsers(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error('Error fetching users', error);
+      setUsers([]);
     }
   };
 

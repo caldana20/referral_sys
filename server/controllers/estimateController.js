@@ -65,6 +65,10 @@ exports.createEstimate = async (req, res) => {
     // But creating an estimate might trigger a status change.
     // I'll leave it as Open for now, as Admin closes it.
 
+    // Update referral status to Used
+    referral.status = 'Used';
+    await referral.save();
+
     res.status(201).json(estimate);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

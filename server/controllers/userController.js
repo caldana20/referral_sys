@@ -1,5 +1,7 @@
 const { User } = require('../models');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const csv = require('csv-parser');
 
 // Get all users (admins and clients)
 exports.getUsers = async (req, res) => {
@@ -74,4 +76,77 @@ exports.deleteUser = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
+};
+
+exports.importClients = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
+  }
+
+  const results = [];
+  const errors = [];
+  let importedCount = 0;
+
+  fs.createReadStream(req.file.path)
+    .pipe(csv())
+    .on('data', (data) => results.push(data))
+    .on('end', async () => {
+      // Clean up file
+      try {
+        if (fs.existsSync(req.file.path)) {
+             fs.unlinkSync(req.file.path);
+        }
+      } catch (cleanupErr) {
+        console.error('Error cleaning up file:', cleanupErr);
+      }
+
+      for (const row of results) {
+        // Case-insensitive key lookup
+        const findKey = (obj, key) => Object.keys(obj).find(k => k.toLowerCase().trim() === key.toLowerCase());
+        
+        const nameKey = findKey(row, 'name');
+        const emailKey = findKey(row, 'email');
+        const phoneKey = findKey(row, 'phone');
+
+        const name = nameKey ? row[nameKey] : null;
+        const email = emailKey ? row[emailKey] : null;
+        const phone = phoneKey ? row[phoneKey] : null;
+
+        if (!name || !email) {
+          console.log('Skipping row missing name or email:', row);
+          errors.push(`Skipped row: Missing Name or Email`);
+          continue;
+        }
+
+        try {
+            const normalizedEmail = email.toLowerCase().trim();
+            const existingUser = await User.findOne({ where: { email: normalizedEmail } });
+            
+            if (!existingUser) {
+                await User.create({
+                    name,
+                    email: normalizedEmail,
+                    phone: phone || null,
+                    role: 'client',
+                    password_hash: null 
+                });
+                importedCount++;
+            } else {
+                errors.push(`Skipped ${email}: User already exists`);
+            }
+        } catch (err) {
+            errors.push(`Failed to import ${email}: ${err.message}`);
+        }
+      }
+
+      res.json({ 
+        message: 'Import processed', 
+        importedCount, 
+        totalRows: results.length,
+        errors 
+      });
+    })
+    .on('error', (error) => {
+      res.status(500).json({ message: 'Error parsing CSV', error: error.message });
+    });
 };

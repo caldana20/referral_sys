@@ -49,7 +49,7 @@ exports.getReferrals = async (req, res) => {
     const referrals = await Referral.findAll({
       include: [
         { model: User, attributes: ['name', 'email'] },
-        { model: Estimate }
+        { model: Estimate, attributes: ['createdAt'] } // Include creation date
       ]
     });
     res.json(referrals);
@@ -88,6 +88,21 @@ exports.getReferralByCode = async (req, res) => {
 
     res.json(referralData);
   } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.bulkDeleteReferrals = async (req, res) => {
+  const { ids } = req.body;
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ message: 'No referral IDs provided' });
+  }
+
+  try {
+    await Referral.destroy({ where: { id: ids } });
+    res.json({ message: 'Referrals deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting referrals:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

@@ -1,17 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const CustomerDashboard = () => {
   const [step, setStep] = useState(1);
+  const [rewards, setRewards] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     prospectName: '',
     prospectEmail: '',
-    selectedReward: 'service discount'
+    selectedReward: ''
   });
   const [generatedLink, setGeneratedLink] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchRewards = async () => {
+      try {
+        const res = await axios.get('/api/rewards/active');
+        const rewardsData = Array.isArray(res.data) ? res.data : [];
+        setRewards(rewardsData);
+        if (rewardsData.length > 0) {
+          setFormData(prev => ({ ...prev, selectedReward: rewardsData[0].name }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch rewards', err);
+        // Fallback defaults if API fails
+        setRewards([
+            { id: 1, name: 'Service Discount' },
+            { id: 2, name: 'Free Laundry' },
+            { id: 3, name: 'Pest Treatment' }
+        ]);
+        setFormData(prev => ({ ...prev, selectedReward: 'Service Discount' }));
+      }
+    };
+    fetchRewards();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -62,9 +86,11 @@ const CustomerDashboard = () => {
             <div className="mt-auto">
               <p className="text-sm font-semibold uppercase tracking-wider opacity-75">Rewards Include</p>
               <ul className="mt-2 space-y-1 text-brand-50">
-                <li>✨ Service Discounts</li>
-                <li>✨ Free Laundry</li>
-                <li>✨ Pest Treatment</li>
+                {rewards.length > 0 ? (
+                    rewards.slice(0, 3).map(r => <li key={r.id}>✨ {r.name}</li>)
+                ) : (
+                    <li>✨ Service Discounts</li>
+                )}
               </ul>
             </div>
           </div>
@@ -103,9 +129,9 @@ const CustomerDashboard = () => {
                             className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
                             value={formData.selectedReward} onChange={handleChange}
                         >
-                            <option value="service discount">Service Discount</option>
-                            <option value="free laundry">Free Laundry</option>
-                            <option value="pest treatment">Pest Treatment</option>
+                            {rewards.map(r => (
+                                <option key={r.id} value={r.name}>{r.name}</option>
+                            ))}
                         </select>
                     </div>
 
