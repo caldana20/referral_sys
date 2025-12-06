@@ -1,5 +1,6 @@
 const { Referral, User, Estimate } = require('../models');
 const crypto = require('crypto');
+const { sendEmail } = require('../utils/emailService');
 
 exports.createReferral = async (req, res) => {
   // Client identifies themselves
@@ -36,6 +37,90 @@ exports.createReferral = async (req, res) => {
     const referral = await Referral.create(referralData);
 
     console.log('Referral created:', referral.id);
+
+    // Send confirmation email to the client
+    const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const referralLink = `${baseUrl}/referral/${code}`;
+    
+    // --- Send Email to Client ---
+    const clientEmailSubject = 'Your Cleaning Angels Referral Link is Ready! ✨';
+    const clientEmailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #2563eb; margin: 0;">Cleaning Angels</h2>
+        </div>
+        
+        <div style="text-align: center; background-color: #f0f9ff; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
+          <h1 style="color: #1e3a8a; margin-top: 0; font-size: 24px;">Your Link is Ready!</h1>
+          <p style="color: #4b5563; font-size: 16px;">Here is your unique referral link to share with your friend.</p>
+          
+          <div style="background-color: #ffffff; padding: 15px; border: 2px dashed #2563eb; border-radius: 6px; margin: 20px 0; word-break: break-all;">
+            <a href="${referralLink}" style="color: #2563eb; text-decoration: none; font-weight: bold; font-size: 18px;">${referralLink}</a>
+          </div>
+          
+          <p style="color: #4b5563; margin-bottom: 0;">Reward selected: <strong>${selectedReward}</strong></p>
+        </div>
+
+        <div style="color: #6b7280; font-size: 14px; line-height: 1.5;">
+          <p><strong>What's next?</strong></p>
+          <ol>
+            <li>Share this link with your friend.</li>
+            <li>When they request an estimate using your link, we'll track it.</li>
+            <li>Once their service is completed, you earn your reward!</li>
+          </ol>
+          ${prospectName ? `<p>We've noted that this link is for <strong>${prospectName}</strong>.</p>` : ''}
+        </div>
+        
+        <div style="margin-top: 30px; pt-20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
+          <p>&copy; ${new Date().getFullYear()} Cleaning Angels. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    // Send to Client
+    sendEmail({
+      to: user.email,
+      subject: clientEmailSubject,
+      html: clientEmailHtml
+    }).catch(err => console.error('Failed to send referral confirmation email to client:', err));
+
+    // --- Send Email to Admins ---
+    try {
+        const admins = await User.findAll({ where: { role: 'admin' } });
+        const adminEmails = admins.map(a => a.email);
+
+        if (adminEmails.length > 0) {
+            const adminEmailHtml = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
+                <h2 style="color: #2563eb; text-align: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">New Referral Link Created</h2>
+                <p style="font-size: 16px; color: #374151;">A client has generated a new referral link.</p>
+                
+                <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; border: 1px solid #e5e7eb;">
+                    <ul style="list-style: none; padding: 0; margin: 0;">
+                        <li style="margin-bottom: 8px;"><strong>Client Name:</strong> ${user.name}</li>
+                        <li style="margin-bottom: 8px;"><strong>Client Email:</strong> ${user.email}</li>
+                        <li style="margin-bottom: 8px;"><strong>Reward Selected:</strong> <span style="color: #059669; font-weight: bold;">${selectedReward}</span></li>
+                        <li style="margin-bottom: 8px;"><strong>Target Prospect:</strong> ${prospectName || 'N/A'}</li>
+                        <li><strong>Referral Code:</strong> <code style="background-color: #e0f2fe; color: #0284c7; padding: 2px 4px; border-radius: 4px;">${code}</code></li>
+                    </ul>
+                </div>
+                
+                <div style="margin-top: 20px; font-size: 14px; color: #6b7280; text-align: center;">
+                    Cleaning Angels Admin Notification
+                </div>
+              </div>
+            `;
+
+            sendEmail({
+                to: adminEmails,
+                subject: 'New Referral Link Generated',
+                html: adminEmailHtml
+            }).catch(err => console.error('Failed to send admin notification for new referral:', err));
+        }
+    } catch (adminErr) {
+        console.error('Error fetching admins for notification:', adminErr);
+    }
+
     res.status(201).json(referral);
 
   } catch (error) {

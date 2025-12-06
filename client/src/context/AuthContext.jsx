@@ -20,6 +20,21 @@ export const AuthProvider = ({ children }) => {
       }
     }
     setLoading(false);
+
+    // Setup Axios interceptor to handle expired tokens
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+          logout();
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
   }, []);
 
   const login = async (email, password) => {

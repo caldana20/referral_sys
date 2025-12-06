@@ -11,6 +11,7 @@ import ReferralLanding from './pages/ReferralLanding';
 import AdminDashboard from './pages/AdminDashboard';
 import UserManagement from './pages/UserManagement';
 import ClientManagement from './pages/ClientManagement';
+import BulkUpload from './pages/BulkUpload';
 
 function App() {
   return (
@@ -44,6 +45,14 @@ function App() {
             element={
               <ProtectedRoute role="admin">
                 <ClientManagement />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/bulk-upload" 
+            element={
+              <ProtectedRoute role="admin">
+                <BulkUpload />
               </ProtectedRoute>
             } 
           />
