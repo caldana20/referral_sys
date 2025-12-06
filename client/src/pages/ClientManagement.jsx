@@ -76,6 +76,7 @@ const ClientManagement = () => {
             <Link to="/admin/dashboard" className="text-blue-600 hover:underline">Referrals</Link>
             <Link to="/admin/users" className="text-blue-600 hover:underline">Admins</Link>
             <span className="font-bold text-gray-800">Clients</span>
+            <Link to="/admin/bulk-email" className="text-purple-600 hover:underline">Bulk Email</Link>
             <button onClick={logout} className="text-red-600 hover:text-red-800 ml-4">Logout</button>
         </div>
       </nav>

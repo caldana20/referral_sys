@@ -131,6 +131,67 @@ exports.createEstimate = async (req, res) => {
         console.error('Failed to trigger client email notification:', clientEmailError);
     }
 
+    // --- Send Confirmation Email to Prospect (Estimate Requester) ---
+    try {
+        const prospectEmailHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h2 style="color: #2563eb; margin: 0;">Cleaning Angels</h2>
+            </div>
+            
+            <div style="text-align: center; background-color: #eff6ff; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
+              <h1 style="color: #1e40af; margin-top: 0; font-size: 24px;">Thank You for Your Request!</h1>
+              <p style="color: #374151; font-size: 16px;">
+                We've received your estimate request and will be in touch soon.
+              </p>
+            </div>
+
+            <div style="color: #4b5563; font-size: 15px; line-height: 1.6;">
+              <p>Hi ${name},</p>
+              <p>Thank you for requesting an estimate from Cleaning Angels! We're excited to help make your home sparkle.</p>
+              
+              <div style="background-color: #f9fafb; padding: 15px; border-left: 4px solid #2563eb; margin: 20px 0;">
+                <p style="margin: 0 0 8px 0;"><strong>Request Summary:</strong></p>
+                <p style="margin: 4px 0;"><strong>Name:</strong> ${name}</p>
+                <p style="margin: 4px 0;"><strong>Email:</strong> ${email}</p>
+                <p style="margin: 4px 0;"><strong>Phone:</strong> ${phone}</p>
+                <p style="margin: 4px 0;"><strong>Location:</strong> ${address}${city ? `, ${city}` : ''}</p>
+              </div>
+
+              ${description ? `
+                <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; margin: 20px 0; border: 1px solid #e5e7eb;">
+                  <p style="margin: 0 0 8px 0; font-weight: bold; color: #374151;">Your Notes:</p>
+                  <p style="margin: 0; color: #4b5563;">${description}</p>
+                </div>
+              ` : ''}
+
+              <p><strong>What happens next?</strong></p>
+              <ul style="padding-left: 20px;">
+                <li>Our team will review your request within 24 hours.</li>
+                <li>We'll contact you at <strong>${phone}</strong> or <strong>${email}</strong> to schedule a convenient time.</li>
+                <li>During our visit, we'll provide a detailed estimate tailored to your needs.</li>
+                <li>You're under no obligation - the estimate is completely free!</li>
+              </ul>
+
+              <p style="margin-top: 20px;">If you have any questions before we contact you, feel free to reach out to us directly.</p>
+            </div>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
+              <p>We look forward to serving you!</p>
+              <p>&copy; ${new Date().getFullYear()} Cleaning Angels. All rights reserved.</p>
+            </div>
+          </div>
+        `;
+
+        sendEmail({
+            to: email,
+            subject: 'Your Estimate Request Has Been Received ✨',
+            html: prospectEmailHtml
+        }).catch(err => console.error('Failed to send prospect confirmation email:', err));
+    } catch (prospectEmailError) {
+        console.error('Failed to trigger prospect email notification:', prospectEmailError);
+    }
+
     // Optionally update referral status to 'Wait'?
     // The diagrams say "submitEstimate" -> "addProspect" -> "setStatus" on Referral?
     // The Close Reward flow is Manual by Admin.

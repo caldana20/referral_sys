@@ -181,6 +181,7 @@ const AdminDashboard = () => {
         <div className="space-x-4">
             <Link to="/admin/users" className="text-blue-600 hover:underline">Admins</Link>
             <Link to="/admin/clients" className="text-blue-600 hover:underline">Clients</Link>
+            <Link to="/admin/bulk-email" className="text-purple-600 hover:underline">Bulk Email</Link>
             <button onClick={logout} className="text-red-600 hover:text-red-800">Logout</button>
         </div>
       </nav>
