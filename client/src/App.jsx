@@ -12,6 +12,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import UserManagement from './pages/UserManagement';
 import ClientManagement from './pages/ClientManagement';
 import BulkUpload from './pages/BulkUpload';
+import BulkEmail from './pages/BulkEmail';
 
 function App() {
   return (
@@ -53,6 +54,14 @@ function App() {
             element={
               <ProtectedRoute role="admin">
                 <BulkUpload />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/bulk-email" 
+            element={
+              <ProtectedRoute role="admin">
+                <BulkEmail />
               </ProtectedRoute>
             } 
           />

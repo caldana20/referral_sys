@@ -6,6 +6,7 @@ const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 
 router.post('/import', authenticateToken, requireAdmin, upload.single('file'), userController.importClients);
+router.post('/bulk-email', authenticateToken, requireAdmin, userController.sendBulkEmail);
 router.get('/', authenticateToken, requireAdmin, userController.getUsers);
 router.post('/', authenticateToken, requireAdmin, userController.createUser);
 router.delete('/:id', authenticateToken, requireAdmin, userController.deleteUser);
