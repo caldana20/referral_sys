@@ -7,6 +7,7 @@ const ReferralLanding = () => {
   const [valid, setValid] = useState(null);
   const [loading, setLoading] = useState(true);
   const [used, setUsed] = useState(false);
+  const [referralData, setReferralData] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,6 +24,7 @@ const ReferralLanding = () => {
       try {
         const res = await axios.get(`/api/referrals/code/${code}`);
         setValid(true);
+        setReferralData(res.data);
         if (res.data.used) {
           setUsed(true);
         }
@@ -58,100 +60,111 @@ const ReferralLanding = () => {
   if (loading) return <div className="text-center p-10">Loading...</div>;
   if (valid === false) return <div className="text-center p-10 text-red-600 text-xl">Invalid or expired referral link.</div>;
 
-  if (used) {
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="bg-white p-8 rounded shadow text-center max-w-md">
-                <h2 className="text-2xl font-bold text-red-600 mb-4">Referral Link Used</h2>
-                <p>This referral link has already been used to request an estimate.</p>
-            </div>
-        </div>
-    );
-  }
-
-  if (submitted) {
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="bg-white p-8 rounded shadow text-center max-w-md">
-                <h2 className="text-2xl font-bold text-green-600 mb-4">Request Submitted!</h2>
-                <p>Thank you! We will contact you shortly for your estimate.</p>
-            </div>
-        </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow">
-        <h1 className="text-3xl font-bold mb-2 text-center">Request an Estimate</h1>
-        <p className="text-center text-gray-600 mb-8">Fill out the form below to get started.</p>
+    <div className="min-h-screen bg-brand-50 flex flex-col">
+      <main className="flex-grow flex items-center justify-center p-4">
+        <div className="max-w-4xl w-full flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden">
+          
+          {/* Left Side: Branding / Image Area */}
+          <div className="md:w-1/2 bg-brand-500 p-10 text-white flex flex-col justify-center">
+            <h2 className="text-4xl font-bold mb-4">Your friend sent you an angel's touch</h2>
+            <p className="text-brand-100 text-lg mb-8">
+              Claim your special offer and get a sparkling clean home.
+            </p>
+            {/* Reward Information Removed */}
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <label className="block text-gray-700">Full Name</label>
-                <input 
-                    type="text" name="name" required
-                    className="w-full border p-2 rounded"
-                    value={formData.name} onChange={handleChange}
-                />
-            </div>
+          {/* Right Side: Form or Status Messages */}
+          <div className="md:w-1/2 p-10 bg-white">
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-gray-700">Email</label>
-                    <input 
-                        type="email" name="email" required
-                        className="w-full border p-2 rounded"
-                        value={formData.email} onChange={handleChange}
-                    />
+            {used ? (
+                <div className="text-center space-y-6 py-8">
+                    <h2 className="text-2xl font-bold text-red-600">Link Used</h2>
+                    <p className="text-gray-600">This referral link has already been used to request an estimate.</p>
                 </div>
-                <div>
-                    <label className="block text-gray-700">Phone</label>
-                    <input 
-                        type="tel" name="phone" required
-                        className="w-full border p-2 rounded"
-                        value={formData.phone} onChange={handleChange}
-                    />
+            ) : submitted ? (
+                <div className="text-center space-y-6 py-8">
+                    <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-3xl">
+                      ✓
+                    </div>
+                    <h2 className="text-2xl font-bold text-green-600">Request Submitted!</h2>
+                    <p className="text-gray-600">Thank you! We will contact you shortly for your estimate.</p>
                 </div>
-            </div>
+            ) : (
+                <>
+                    <h1 className="text-2xl font-bold text-gray-800 mb-6">Request an Estimate</h1>
+                    <p className="text-gray-600 mb-6">Fill out the form below to get started.</p>
 
-            <div>
-                <label className="block text-gray-700">Address</label>
-                <input 
-                    type="text" name="address" required
-                    className="w-full border p-2 rounded"
-                    value={formData.address} onChange={handleChange}
-                />
-            </div>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                            <input 
+                                type="text" name="name" required
+                                className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+                                value={formData.name} onChange={handleChange}
+                            />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input 
+                                    type="email" name="email" required
+                                    className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+                                    value={formData.email} onChange={handleChange}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                                <input 
+                                    type="tel" name="phone" required
+                                    className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+                                    value={formData.phone} onChange={handleChange}
+                                />
+                            </div>
+                        </div>
 
-            <div>
-                <label className="block text-gray-700">City</label>
-                <input 
-                    type="text" name="city"
-                    className="w-full border p-2 rounded"
-                    value={formData.city} onChange={handleChange}
-                />
-            </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                            <input 
+                                type="text" name="address" required
+                                className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+                                value={formData.address} onChange={handleChange}
+                            />
+                        </div>
 
-            <div>
-                <label className="block text-gray-700">Description</label>
-                <textarea 
-                    name="description" rows="4"
-                    className="w-full border p-2 rounded"
-                    value={formData.description} onChange={handleChange}
-                ></textarea>
-            </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                            <input 
+                                type="text" name="city"
+                                className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+                                value={formData.city} onChange={handleChange}
+                            />
+                        </div>
 
-            {error && <p className="text-red-500">{error}</p>}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                            <textarea 
+                                name="description" rows="4"
+                                className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+                                value={formData.description} onChange={handleChange}
+                            ></textarea>
+                        </div>
 
-            <button 
-                type="submit" 
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700"
-            >
-                Submit
-            </button>
-        </form>
-      </div>
+                        {error && <p className="text-red-500 text-sm">{error}</p>}
+
+                        <button 
+                            type="submit" 
+                            className="w-full bg-brand-600 text-white py-3 rounded-lg font-bold hover:bg-brand-700 transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                        >
+                            Submit Request
+                        </button>
+                    </form>
+                </>
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 };

@@ -11,8 +11,6 @@ const ClientManagement = () => {
     phone: ''
   });
   const [error, setError] = useState('');
-  const [importFile, setImportFile] = useState(null);
-  const [importMsg, setImportMsg] = useState('');
 
   const { logout } = useAuth();
 
@@ -30,34 +28,6 @@ const ClientManagement = () => {
     } catch (error) {
       console.error('Error fetching clients', error);
       setClients([]);
-    }
-  };
-
-  const handleFileChange = (e) => {
-    setImportFile(e.target.files[0]);
-  };
-
-  const handleImport = async (e) => {
-    e.preventDefault();
-    if (!importFile) return;
-
-    const formData = new FormData();
-    formData.append('file', importFile);
-
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post('/api/users/import', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      setImportMsg(`Successfully imported ${res.data.importedCount} clients. Skipped/Error: ${res.data.errors.length}`);
-      setImportFile(null);
-      // Reset file input manually if needed, but simple state reset is fine for now
-      fetchClients();
-    } catch (err) {
-      setImportMsg(err.response?.data?.message || 'Error importing file');
     }
   };
 
@@ -124,29 +94,17 @@ const ClientManagement = () => {
             {error && <p className="text-red-500 mt-2">{error}</p>}
         </div>
 
-        <div className="bg-white p-6 rounded shadow mb-8 border-l-4 border-blue-500">
-            <h3 className="text-lg font-semibold mb-4">Bulk Import Clients (CSV)</h3>
-            <p className="text-sm text-gray-600 mb-4">Upload a CSV file with headers: <strong>Name, Email, Phone</strong></p>
-            <form onSubmit={handleImport} className="flex flex-col md:flex-row gap-4 items-center">
-                <input 
-                    type="file" 
-                    accept=".csv"
-                    onChange={handleFileChange}
-                    className="border p-2 rounded w-full md:w-auto"
-                />
-                <button 
-                    type="submit" 
-                    disabled={!importFile}
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-                >
-                    Upload CSV
-                </button>
-            </form>
-            {importMsg && (
-                <div className={`mt-3 p-2 rounded text-sm ${importMsg.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                    {importMsg}
-                </div>
-            )}
+        <div className="bg-blue-50 p-6 rounded shadow mb-8 border border-blue-200 flex justify-between items-center">
+            <div>
+                <h3 className="text-lg font-semibold text-blue-800">Need to import multiple clients?</h3>
+                <p className="text-sm text-blue-600">Upload a CSV file to add clients in bulk.</p>
+            </div>
+            <Link 
+                to="/admin/bulk-upload"
+                className="bg-blue-600 text-white px-6 py-2 rounded shadow hover:bg-blue-700 font-medium"
+            >
+                Go to Bulk Upload
+            </Link>
         </div>
 
         <div className="bg-white rounded shadow overflow-x-auto">

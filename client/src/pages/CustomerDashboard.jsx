@@ -61,18 +61,8 @@ const CustomerDashboard = () => {
 
   return (
     <div className="min-h-screen bg-brand-50 flex flex-col">
-      {/* Header / Navbar simulation */}
-      <header className="bg-white shadow-sm py-4 px-8 flex justify-between items-center">
-        <div className="text-2xl font-bold text-brand-600 tracking-tight">
-          Cleaning Angels
-        </div>
-        <nav className="hidden md:flex space-x-6 text-gray-600 font-medium">
-          <a href="#" className="hover:text-brand-500">Home</a>
-          <a href="#" className="hover:text-brand-500">Services</a>
-          <a href="#" className="hover:text-brand-500">Contact</a>
-        </nav>
-      </header>
-
+      {/* Header / Navbar removed */}
+      
       {/* Hero Section */}
       <main className="flex-grow flex items-center justify-center p-4">
         <div className="max-w-4xl w-full flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden">

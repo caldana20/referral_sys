@@ -5,7 +5,10 @@ exports.createEstimate = async (req, res) => {
   const { referralCode, name, email, phone, address, city, description } = req.body;
 
   try {
-    const referral = await Referral.findOne({ where: { code: referralCode } });
+    const referral = await Referral.findOne({ 
+      where: { code: referralCode },
+      include: [{ model: User }] // Include referrer info
+    });
     if (!referral) return res.status(404).json({ message: 'Invalid referral code' });
 
     if (referral.status !== 'Open') {
@@ -35,16 +38,32 @@ exports.createEstimate = async (req, res) => {
 
       if (adminEmails.length > 0) {
         const emailContent = `
-          <h2>New Estimate Request</h2>
-          <p><strong>Referral Code:</strong> ${referralCode}</p>
-          <h3>Prospect Details:</h3>
-          <ul>
-            <li><strong>Name:</strong> ${name}</li>
-            <li><strong>Email:</strong> ${email}</li>
-            <li><strong>Phone:</strong> ${phone}</li>
-            <li><strong>Address:</strong> ${address}, ${city || 'N/A'}</li>
-          </ul>
-          <p><strong>Description:</strong><br/>${description || 'No description provided.'}</p>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
+            <h2 style="color: #2563eb; text-align: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">New Estimate Request</h2>
+            
+            <div style="background-color: #eff6ff; padding: 10px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
+                <p style="margin: 0; color: #1e40af;"><strong>Referral Code Used:</strong> <span style="font-family: monospace; font-size: 1.1em;">${referralCode}</span></p>
+            </div>
+
+            <h3 style="color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Prospect Details</h3>
+            <ul style="list-style: none; padding: 0;">
+                <li style="padding: 8px 0; border-bottom: 1px solid #f3f4f6;"><strong>Name:</strong> ${name}</li>
+                <li style="padding: 8px 0; border-bottom: 1px solid #f3f4f6;"><strong>Email:</strong> <a href="mailto:${email}" style="color: #2563eb;">${email}</a></li>
+                <li style="padding: 8px 0; border-bottom: 1px solid #f3f4f6;"><strong>Phone:</strong> ${phone}</li>
+                <li style="padding: 8px 0; border-bottom: 1px solid #f3f4f6;"><strong>Address:</strong> ${address}, ${city || ''}</li>
+            </ul>
+
+            <div style="margin-top: 20px;">
+                <h3 style="color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Description</h3>
+                <p style="background-color: #f9fafb; padding: 15px; border-radius: 6px; color: #4b5563; border: 1px solid #e5e7eb;">
+                    ${description || 'No description provided.'}
+                </p>
+            </div>
+            
+            <div style="margin-top: 20px; font-size: 14px; color: #6b7280; text-align: center;">
+                Cleaning Angels Admin Notification
+            </div>
+          </div>
         `;
 
         // Send email asynchronously
@@ -57,6 +76,59 @@ exports.createEstimate = async (req, res) => {
     } catch (emailError) {
       console.error('Failed to trigger admin email notification:', emailError);
       // Continue - do not fail the request if email fails
+    }
+
+    // --- Send Confirmation Email to Client (Referrer) ---
+    try {
+        if (referral.User && referral.User.email) {
+            const referrerEmail = referral.User.email;
+            const referrerName = referral.User.name || 'Valued Client';
+            const rewardName = referral.selectedReward;
+
+            const clientEmailHtml = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                  <h2 style="color: #2563eb; margin: 0;">Cleaning Angels</h2>
+                </div>
+                
+                <div style="text-align: center; background-color: #f0fdf4; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
+                  <h1 style="color: #166534; margin-top: 0; font-size: 24px;">Good News!</h1>
+                  <p style="color: #374151; font-size: 16px;">
+                    Your friend <strong>${name}</strong> has just requested an estimate using your referral link!
+                  </p>
+                </div>
+
+                <div style="color: #4b5563; font-size: 15px; line-height: 1.6;">
+                  <p>Hi ${referrerName},</p>
+                  <p>We wanted to let you know that your referral code was successfully used.</p>
+                  
+                  <div style="background-color: #f9fafb; padding: 15px; border-left: 4px solid #2563eb; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>Your Pending Reward:</strong> ${rewardName}</p>
+                  </div>
+
+                  <p><strong>What happens next?</strong></p>
+                  <ul>
+                    <li>We will contact your friend to provide an estimate.</li>
+                    <li>Once their service is completed and paid for, your reward will be activated!</li>
+                    <li>We'll send you another email when your reward is ready to use.</li>
+                  </ul>
+                </div>
+                
+                <div style="margin-top: 30px; pt-20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
+                  <p>Thank you for spreading the word!</p>
+                  <p>&copy; ${new Date().getFullYear()} Cleaning Angels. All rights reserved.</p>
+                </div>
+              </div>
+            `;
+
+            sendEmail({
+                to: referrerEmail,
+                subject: 'Your Referral Code was Used! 🎉',
+                html: clientEmailHtml
+            }).catch(err => console.error('Failed to send referrer confirmation email:', err));
+        }
+    } catch (clientEmailError) {
+        console.error('Failed to trigger client email notification:', clientEmailError);
     }
 
     // Optionally update referral status to 'Wait'?
