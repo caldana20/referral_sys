@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useSearchParams } from 'react-router-dom';
 
 const CustomerDashboard = () => {
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState(1);
   const [rewards, setRewards] = useState([]);
   const [formData, setFormData] = useState({
@@ -13,6 +15,7 @@ const CustomerDashboard = () => {
   });
   const [generatedLink, setGeneratedLink] = useState('');
   const [error, setError] = useState('');
+  const [isLoadingClientInfo, setIsLoadingClientInfo] = useState(false);
 
   useEffect(() => {
     const fetchRewards = async () => {
@@ -36,6 +39,33 @@ const CustomerDashboard = () => {
     };
     fetchRewards();
   }, []);
+
+  // Check for token in URL and pre-fill form
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (token) {
+      setIsLoadingClientInfo(true);
+      axios.get(`/api/users/validate-client-token?token=${token}`)
+        .then(res => {
+          const { name, email } = res.data;
+          setFormData(prev => ({
+            ...prev,
+            name: name || prev.name,
+            email: email || prev.email
+          }));
+          setIsLoadingClientInfo(false);
+        })
+        .catch(err => {
+          console.error('Failed to validate token:', err);
+          if (err.response?.status === 401) {
+            setError('This link has expired. Please contact support for a new link.');
+          } else {
+            setError('Unable to pre-fill form. You can still enter your information manually.');
+          }
+          setIsLoadingClientInfo(false);
+        });
+    }
+  }, [searchParams]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -89,6 +119,12 @@ const CustomerDashboard = () => {
           <div className="md:w-1/2 p-10 bg-white">
             <h1 className="text-2xl font-bold text-gray-800 mb-6">Generate Referral Link</h1>
             
+            {isLoadingClientInfo && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">Loading your information...</p>
+              </div>
+            )}
+            
             {step === 1 && (
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-4">
@@ -99,6 +135,7 @@ const CustomerDashboard = () => {
                             className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
                             placeholder="John Doe"
                             value={formData.name} onChange={handleChange}
+                            disabled={isLoadingClientInfo}
                         />
                     </div>
                     <div>
@@ -108,6 +145,7 @@ const CustomerDashboard = () => {
                             className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
                             placeholder="client@example.com"
                             value={formData.email} onChange={handleChange}
+                            disabled={isLoadingClientInfo}
                         />
                         <p className="text-xs text-gray-500 mt-1">Must be an active client email.</p>
                     </div>
@@ -147,9 +185,10 @@ const CustomerDashboard = () => {
 
                     <button 
                         type="submit" 
-                        className="w-full bg-brand-600 text-white py-3 rounded-lg font-bold hover:bg-brand-700 transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                        className="w-full bg-brand-600 text-white py-3 rounded-lg font-bold hover:bg-brand-700 transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={isLoadingClientInfo}
                     >
-                        Get Reward Link
+                        {isLoadingClientInfo ? 'Loading...' : 'Get Reward Link'}
                     </button>
                 </div>
               </form>

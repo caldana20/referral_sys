@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const csv = require('csv-parser');
 const { sendEmail } = require('../utils/emailService');
+const jwt = require('jsonwebtoken');
 
 // Get all users (admins and clients)
 exports.getUsers = async (req, res) => {
@@ -172,14 +173,28 @@ exports.sendBulkEmail = async (req, res) => {
     }
 
     const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-    const rewardFormLink = baseUrl;
 
     let sentCount = 0;
     let failedCount = 0;
 
-    // Send emails to each client
+    // Send emails to each client with their personalized link
     for (const client of clients) {
       try {
+        // Generate a client-specific token for this client
+        const token = jwt.sign(
+          { 
+            clientId: client.id,
+            clientEmail: client.email,
+            clientName: client.name,
+            type: 'client_referral_link'
+          },
+          process.env.JWT_SECRET || 'secret_key',
+          { expiresIn: '30d' }
+        );
+
+        // Create personalized link that will pre-fill their information
+        const personalizedLink = `${baseUrl}/generate-referral?token=${token}`;
+
         const emailHtml = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
             <div style="text-align: center; margin-bottom: 20px;">
@@ -200,20 +215,21 @@ exports.sendBulkEmail = async (req, res) => {
               <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #22c55e;">
                 <h3 style="color: #166534; margin-top: 0;">How It Works:</h3>
                 <ol style="padding-left: 20px; color: #374151;">
-                  <li>Generate your unique referral link</li>
-                  <li>Share it with friends and family</li>
+                  <li>Click the button below to access your personalized referral form</li>
+                  <li>Your information will be pre-filled automatically</li>
+                  <li>Generate your unique referral link and share it with friends and family</li>
                   <li>When they request an estimate using your link, you earn rewards!</li>
                   <li>Rewards are activated once their service is completed</li>
                 </ol>
               </div>
 
               <div style="text-align: center; margin: 30px 0;">
-                <a href="${rewardFormLink}" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                <a href="${personalizedLink}" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
                   Get Started - Generate Your Referral Link
                 </a>
               </div>
 
-              <p style="margin-top: 20px;">It's that simple! Click the button above to create your referral link and start earning rewards today.</p>
+              <p style="margin-top: 20px;">It's that simple! Click the button above to create your referral link and start earning rewards today. Your information will be automatically filled in for your convenience.</p>
             </div>
             
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
@@ -244,6 +260,89 @@ exports.sendBulkEmail = async (req, res) => {
     });
   } catch (error) {
     console.error('Error sending bulk emails:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Generate a client-specific referral link token
+exports.generateClientReferralLink = async (req, res) => {
+  const { clientId } = req.params;
+
+  try {
+    const client = await User.findByPk(clientId);
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+
+    if (client.role !== 'client') {
+      return res.status(400).json({ message: 'User is not a client' });
+    }
+
+    // Generate a JWT token that expires in 30 days
+    const token = jwt.sign(
+      { 
+        clientId: client.id,
+        clientEmail: client.email,
+        clientName: client.name,
+        type: 'client_referral_link'
+      },
+      process.env.JWT_SECRET || 'secret_key',
+      { expiresIn: '30d' }
+    );
+
+    const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const referralLink = `${baseUrl}/generate-referral?token=${token}`;
+
+    res.json({
+      link: referralLink,
+      token: token,
+      client: {
+        id: client.id,
+        name: client.name,
+        email: client.email
+      }
+    });
+  } catch (error) {
+    console.error('Error generating client referral link:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Validate token and return client info for pre-filling form
+exports.validateClientToken = async (req, res) => {
+  const { token } = req.query;
+
+  if (!token) {
+    return res.status(400).json({ message: 'Token is required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
+
+    // Verify it's a client referral link token
+    if (decoded.type !== 'client_referral_link') {
+      return res.status(400).json({ message: 'Invalid token type' });
+    }
+
+    // Verify client still exists
+    const client = await User.findByPk(decoded.clientId);
+    if (!client || client.role !== 'client') {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+
+    res.json({
+      name: client.name,
+      email: client.email,
+      clientId: client.id
+    });
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token has expired' });
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    console.error('Error validating client token:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
