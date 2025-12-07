@@ -21,6 +21,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<CustomerDashboard />} />
+          <Route path="/generate-referral" element={<CustomerDashboard />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/referral/:code" element={<ReferralLanding />} />
 

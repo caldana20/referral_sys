@@ -11,6 +11,9 @@ const ClientManagement = () => {
     phone: ''
   });
   const [error, setError] = useState('');
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkClientName, setLinkClientName] = useState('');
 
   const { logout } = useAuth();
 
@@ -66,6 +69,25 @@ const ClientManagement = () => {
     } catch (err) {
       alert(err.response?.data?.message || 'Error deleting client');
     }
+  };
+
+  const generateClientLink = async (clientId, clientName) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`/api/users/${clientId}/generate-referral-link`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setGeneratedLink(res.data.link);
+      setLinkClientName(clientName);
+      setShowLinkModal(true);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error generating link');
+    }
+  };
+
+  const copyLinkToClipboard = () => {
+    navigator.clipboard.writeText(generatedLink);
+    alert('Link copied to clipboard!');
   };
 
   return (
@@ -127,7 +149,21 @@ const ClientManagement = () => {
                             <td className="p-4">{client.phone || '-'}</td>
                             <td className="p-4 text-sm text-gray-500">{new Date(client.createdAt).toLocaleDateString()}</td>
                             <td className="p-4">
-                                <button onClick={() => deleteClient(client.id)} className="text-red-600 hover:text-red-800">Delete</button>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => generateClientLink(client.id, client.name)} 
+                                        className="text-blue-600 hover:text-blue-800 font-medium"
+                                    >
+                                        Generate Link
+                                    </button>
+                                    <span className="text-gray-300">|</span>
+                                    <button 
+                                        onClick={() => deleteClient(client.id)} 
+                                        className="text-red-600 hover:text-red-800"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     ))}
@@ -135,6 +171,44 @@ const ClientManagement = () => {
             </table>
             {clients.length === 0 && <div className="p-8 text-center text-gray-500">No clients found.</div>}
         </div>
+
+        {/* Link Modal */}
+        {showLinkModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold mb-4">Client-Specific Referral Link</h3>
+              <p className="text-gray-600 mb-4">
+                This link will automatically pre-fill <strong>{linkClientName}</strong>'s name and email when accessed.
+              </p>
+              <div className="bg-gray-50 p-3 rounded border border-gray-200 mb-4">
+                <input
+                  type="text"
+                  readOnly
+                  value={generatedLink}
+                  className="w-full bg-transparent text-sm text-gray-700 break-all"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={copyLinkToClipboard}
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+                >
+                  Copy Link
+                </button>
+                <button
+                  onClick={() => {
+                    setShowLinkModal(false);
+                    setGeneratedLink('');
+                    setLinkClientName('');
+                  }}
+                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-400"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
