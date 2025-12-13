@@ -61,17 +61,32 @@ const ReferralLanding = () => {
   if (valid === false) return <div className="text-center p-10 text-red-600 text-xl">Invalid or expired referral link.</div>;
 
   return (
-    <div className="min-h-screen bg-brand-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-green-50 flex flex-col">
       <main className="flex-grow flex items-center justify-center p-4">
-        <div className="max-w-4xl w-full flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="max-w-4xl w-full flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden border border-red-100">
           
           {/* Left Side: Branding / Image Area */}
-          <div className="md:w-1/2 bg-brand-500 p-10 text-white flex flex-col justify-center">
+          <div className="md:w-1/2 bg-brand-500 p-10 text-white flex flex-col justify-center relative">
+            <div className="absolute top-6 right-6 bg-red-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow">
+              Holiday Offer
+            </div>
+            <div className="flex justify-center mb-6">
+              <img
+                src="/yourcleaningangels-logo.png"
+                alt="YourCleaningAngels.com"
+                className="h-24 md:h-28 w-auto drop-shadow"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
             <h2 className="text-4xl font-bold mb-4">Your friend sent you an angel's touch</h2>
             <p className="text-brand-100 text-lg mb-8">
-              Claim your special offer and get a sparkling clean home.
+              Claim your special holiday offer and get a sparkling clean home.
             </p>
-            {/* Reward Information Removed */}
+            <div className="text-sm text-brand-50 bg-white/10 border border-white/20 rounded-lg px-4 py-3 w-fit shadow">
+              🎁 Festive cleaning, made easy.
+            </div>
           </div>
 
           {/* Right Side: Form or Status Messages */}
@@ -92,8 +107,11 @@ const ReferralLanding = () => {
                 </div>
             ) : (
                 <>
-                    <h1 className="text-2xl font-bold text-gray-800 mb-6">Request an Estimate</h1>
-                    <p className="text-gray-600 mb-6">Fill out the form below to get started.</p>
+                    <div className="mb-6">
+                      <h1 className="text-2xl font-bold text-gray-800">Request an Estimate</h1>
+                      <div className="mt-2 h-1 w-16 bg-red-200 rounded" />
+                      <p className="text-gray-600 mt-4">Fill out the form below to get started.</p>
+                    </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>

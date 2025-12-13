@@ -134,10 +134,18 @@ exports.getReferrals = async (req, res) => {
     const referrals = await Referral.findAll({
       include: [
         { model: User, attributes: ['name', 'email'] },
-        { model: Estimate, attributes: ['createdAt'] } // Include creation date
-      ]
+        { model: Estimate, attributes: ['id', 'createdAt', 'name', 'email'], required: false } // Include id, creation date, name, and email
+      ],
+      order: [['createdAt', 'DESC']]
     });
-    res.json(referrals);
+    
+    // Ensure Estimates are properly serialized
+    const serializedReferrals = referrals.map(referral => {
+      const ref = referral.toJSON();
+      return ref;
+    });
+    
+    res.json(serializedReferrals);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -148,11 +156,72 @@ exports.updateReferralStatus = async (req, res) => {
   const { status } = req.body;
 
   try {
-    const referral = await Referral.findByPk(id);
+    const referral = await Referral.findByPk(id, {
+      include: [{ model: User }]
+    });
     if (!referral) return res.status(404).json({ message: 'Referral not found' });
 
+    const previousStatus = referral.status;
     referral.status = status;
     await referral.save();
+
+    // Send email notification when referral is closed
+    if (status === 'Closed' && previousStatus !== 'Closed' && referral.User) {
+      try {
+        const clientEmailHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h2 style="color: #2563eb; margin: 0;">Cleaning Angels</h2>
+            </div>
+            
+            <div style="text-align: center; background-color: #f0fdf4; padding: 30px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+              <h1 style="color: #166534; margin-top: 0; font-size: 24px;">Your Reward Has Been Activated! 🎉</h1>
+              <p style="color: #374151; font-size: 16px;">
+                Great news! Your referral reward has been closed and is now ready to use.
+              </p>
+            </div>
+
+            <div style="color: #4b5563; font-size: 15px; line-height: 1.6;">
+              <p>Hi ${referral.User.name},</p>
+              <p>We're excited to let you know that your referral reward has been successfully closed and activated!</p>
+              
+              <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb;">
+                <h3 style="color: #374151; margin-top: 0;">Referral Details:</h3>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                  <li style="margin-bottom: 10px;"><strong>Referral Code:</strong> <code style="background-color: #e0f2fe; color: #0284c7; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${referral.code}</code></li>
+                  <li style="margin-bottom: 10px;"><strong>Reward:</strong> <span style="color: #059669; font-weight: bold;">${referral.selectedReward}</span></li>
+                  ${referral.prospectName ? `<li style="margin-bottom: 10px;"><strong>Referred:</strong> ${referral.prospectName}</li>` : ''}
+                </ul>
+              </div>
+
+              <div style="background-color: #eff6ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
+                <h3 style="color: #1e40af; margin-top: 0;">What This Means:</h3>
+                <p style="margin: 0; color: #374151;">Your reward is now active and ready to use! Thank you for referring friends to Cleaning Angels. We truly appreciate your support.</p>
+              </div>
+
+              <p style="margin-top: 20px;">If you have any questions about your reward or need assistance, please don't hesitate to contact us.</p>
+            </div>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
+              <p>Thank you for being a valued Cleaning Angels client!</p>
+              <p>&copy; ${new Date().getFullYear()} Cleaning Angels. All rights reserved.</p>
+            </div>
+          </div>
+        `;
+
+        await sendEmail({
+          to: referral.User.email,
+          subject: 'Your Cleaning Angels Reward Has Been Activated! 🎉',
+          html: clientEmailHtml
+        });
+
+        console.log(`Reward closure email sent to ${referral.User.email} for referral ${referral.code}`);
+      } catch (emailError) {
+        console.error(`Failed to send reward closure email to ${referral.User.email}:`, emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
     res.json(referral);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

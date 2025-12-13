@@ -257,72 +257,89 @@ const AdminDashboard = () => {
                 </div>
             </div>
             <div className="bg-white rounded shadow overflow-x-auto">
-                <table className="min-w-full text-left">
+                <table className="w-full text-left text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b">
-                            <th className="p-4">
+                            <th className="p-2 w-12">
                                 <input 
                                     type="checkbox" 
                                     onChange={handleSelectAll}
                                     checked={filteredReferrals.length > 0 && selectedIds.length === filteredReferrals.length}
                                 />
                             </th>
-                            <th className="p-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('createdAt')}>
-                                Created Date {sortConfig.key === 'createdAt' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                            <th className="p-2 cursor-pointer hover:bg-gray-100 whitespace-nowrap" onClick={() => handleSort('createdAt')}>
+                                Created {sortConfig.key === 'createdAt' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
-                            <th className="p-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('referrer')}>
+                            <th className="p-2 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('referrer')}>
                                 Referrer {sortConfig.key === 'referrer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
-                            <th className="p-4">Code</th>
-                            <th className="p-4">Reward</th>
-                            <th className="p-4">Prospect Info</th>
-                            <th className="p-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('estimates')}>
-                                Estimates {sortConfig.key === 'estimates' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                            <th className="p-2 whitespace-nowrap">Code</th>
+                            <th className="p-2 whitespace-nowrap">Reward</th>
+                            <th className="p-2 whitespace-nowrap">Prospect</th>
+                            <th className="p-2 whitespace-nowrap">Referred</th>
+                            <th className="p-2 cursor-pointer hover:bg-gray-100 whitespace-nowrap" onClick={() => handleSort('estimates')}>
+                                Est. {sortConfig.key === 'estimates' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
-                            <th className="p-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('estimateDate')}>
-                                Estimate Date {sortConfig.key === 'estimateDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                            <th className="p-2 cursor-pointer hover:bg-gray-100 whitespace-nowrap" onClick={() => handleSort('estimateDate')}>
+                                Est. Date {sortConfig.key === 'estimateDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
-                            <th className="p-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('status')}>
+                            <th className="p-2 cursor-pointer hover:bg-gray-100 whitespace-nowrap" onClick={() => handleSort('status')}>
                                 Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
-                            <th className="p-4">Actions</th>
+                            <th className="p-2 whitespace-nowrap">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredReferrals.map(ref => (
                             <tr key={ref.id} className="border-b hover:bg-gray-50">
-                                <td className="p-4">
+                                <td className="p-2">
                                     <input 
                                         type="checkbox" 
                                         checked={selectedIds.includes(ref.id)}
                                         onChange={() => handleSelectOne(ref.id)}
                                     />
                                 </td>
-                                <td className="p-4 text-sm text-gray-600">
+                                <td className="p-2 text-xs text-gray-600 whitespace-nowrap">
                                     {ref.createdAt ? new Date(ref.createdAt).toLocaleDateString() : '-'}
-                                    <div className="text-xs text-gray-400 mt-1">
+                                    <div className="text-xs text-gray-400">
                                         {ref.createdAt ? new Date(ref.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                     </div>
                                 </td>
-                                <td className="p-4">
-                                    <div className="font-bold">{ref.User?.name}</div>
-                                    <div className="text-sm text-gray-500">{ref.User?.email}</div>
+                                <td className="p-2">
+                                    <div className="font-bold text-sm">{ref.User?.name}</div>
+                                    <div className="text-xs text-gray-500 truncate max-w-[120px]">{ref.User?.email}</div>
                                 </td>
-                                <td className="p-4 font-mono">{ref.code}</td>
-                                <td className="p-4">{ref.selectedReward}</td>
-                                <td className="p-4">
-                                    {ref.prospectName && <div>{ref.prospectName}</div>}
-                                    {ref.prospectEmail && <div className="text-sm text-gray-500">{ref.prospectEmail}</div>}
+                                <td className="p-2 font-mono text-xs">{ref.code}</td>
+                                <td className="p-2 text-sm whitespace-nowrap">{ref.selectedReward}</td>
+                                <td className="p-2">
+                                    {ref.prospectName || ref.prospectEmail ? (
+                                        <>
+                                            {ref.prospectName && <div className="font-bold text-sm">{ref.prospectName}</div>}
+                                            {ref.prospectEmail && <div className="text-xs text-gray-500 truncate max-w-[120px]">{ref.prospectEmail}</div>}
+                                        </>
+                                    ) : (
+                                        <span className="text-gray-400 text-xs">-</span>
+                                    )}
                                 </td>
-                                <td className="p-4">
+                                <td className="p-2">
+                                    {ref.Estimates && ref.Estimates.length > 0 && (ref.Estimates[0].name || ref.Estimates[0].email) ? (
+                                        <>
+                                            {ref.Estimates[0].name && <div className="font-bold text-sm">{ref.Estimates[0].name}</div>}
+                                            {ref.Estimates[0].email && <div className="text-xs text-gray-500 truncate max-w-[120px]">{ref.Estimates[0].email}</div>}
+                                        </>
+                                    ) : (
+                                        <span className="text-gray-400 text-xs">-</span>
+                                    )}
+                                </td>
+                                <td className="p-2 text-center text-sm">
                                     {ref.Estimates?.length || 0}
                                 </td>
-                                <td className="p-4 text-sm text-gray-500">
+                                <td className="p-2 text-xs text-gray-500 whitespace-nowrap">
                                     {ref.Estimates && ref.Estimates.length > 0 ? 
                                         new Date(ref.Estimates[0].createdAt).toLocaleDateString() : 
                                         '-'}
                                 </td>
-                                <td className="p-4">
+                                <td className="p-2">
                                     <span className={`px-2 py-1 rounded text-xs font-bold 
                                         ${ref.status === 'Open' ? 'bg-green-100 text-green-800' : 
                                           ref.status === 'Closed' ? 'bg-gray-100 text-gray-800' : 
@@ -330,13 +347,13 @@ const AdminDashboard = () => {
                                         {ref.status}
                                     </span>
                                 </td>
-                                <td className="p-4">
+                                <td className="p-2">
                                     {ref.status !== 'Closed' && (
                                         <button 
                                             onClick={() => updateStatus(ref.id, 'Closed')}
-                                            className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+                                            className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 whitespace-nowrap"
                                         >
-                                            Close Reward
+                                            Close
                                         </button>
                                     )}
                                 </td>
