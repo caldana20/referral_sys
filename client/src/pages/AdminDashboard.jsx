@@ -181,7 +181,7 @@ const AdminDashboard = () => {
         <div className="space-x-4">
             <Link to="/admin/users" className="text-blue-600 hover:underline">Admins</Link>
             <Link to="/admin/clients" className="text-blue-600 hover:underline">Clients</Link>
-            <Link to="/admin/bulk-email" className="text-purple-600 hover:underline">Bulk Email</Link>
+            <Link to="/admin/send-invitations" className="text-purple-600 hover:underline">Send Invitations</Link>
             <button onClick={logout} className="text-red-600 hover:text-red-800">Logout</button>
         </div>
       </nav>
@@ -267,6 +267,9 @@ const AdminDashboard = () => {
                                     checked={filteredReferrals.length > 0 && selectedIds.length === filteredReferrals.length}
                                 />
                             </th>
+                            <th className="p-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('createdAt')}>
+                                Created Date {sortConfig.key === 'createdAt' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                            </th>
                             <th className="p-4 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('referrer')}>
                                 Referrer {sortConfig.key === 'referrer' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
@@ -294,6 +297,12 @@ const AdminDashboard = () => {
                                         checked={selectedIds.includes(ref.id)}
                                         onChange={() => handleSelectOne(ref.id)}
                                     />
+                                </td>
+                                <td className="p-4 text-sm text-gray-600">
+                                    {ref.createdAt ? new Date(ref.createdAt).toLocaleDateString() : '-'}
+                                    <div className="text-xs text-gray-400 mt-1">
+                                        {ref.createdAt ? new Date(ref.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                    </div>
                                 </td>
                                 <td className="p-4">
                                     <div className="font-bold">{ref.User?.name}</div>

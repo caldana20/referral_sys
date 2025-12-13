@@ -98,7 +98,7 @@ const ClientManagement = () => {
             <Link to="/admin/dashboard" className="text-blue-600 hover:underline">Referrals</Link>
             <Link to="/admin/users" className="text-blue-600 hover:underline">Admins</Link>
             <span className="font-bold text-gray-800">Clients</span>
-            <Link to="/admin/bulk-email" className="text-purple-600 hover:underline">Bulk Email</Link>
+            <Link to="/admin/send-invitations" className="text-purple-600 hover:underline">Send Invitations</Link>
             <button onClick={logout} className="text-red-600 hover:text-red-800 ml-4">Logout</button>
         </div>
       </nav>
@@ -117,17 +117,31 @@ const ClientManagement = () => {
             {error && <p className="text-red-500 mt-2">{error}</p>}
         </div>
 
-        <div className="bg-blue-50 p-6 rounded shadow mb-8 border border-blue-200 flex justify-between items-center">
-            <div>
-                <h3 className="text-lg font-semibold text-blue-800">Need to import multiple clients?</h3>
-                <p className="text-sm text-blue-600">Upload a CSV file to add clients in bulk.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div className="bg-blue-50 p-6 rounded shadow border border-blue-200 flex justify-between items-center">
+                <div>
+                    <h3 className="text-lg font-semibold text-blue-800">Need to import multiple clients?</h3>
+                    <p className="text-sm text-blue-600">Upload a CSV file to add clients in bulk.</p>
+                </div>
+                <Link 
+                    to="/admin/bulk-upload"
+                    className="bg-blue-600 text-white px-6 py-2 rounded shadow hover:bg-blue-700 font-medium whitespace-nowrap ml-4"
+                >
+                    Go to Bulk Upload
+                </Link>
             </div>
-            <Link 
-                to="/admin/bulk-upload"
-                className="bg-blue-600 text-white px-6 py-2 rounded shadow hover:bg-blue-700 font-medium"
-            >
-                Go to Bulk Upload
-            </Link>
+            <div className="bg-purple-50 p-6 rounded shadow border border-purple-200 flex justify-between items-center">
+                <div>
+                    <h3 className="text-lg font-semibold text-purple-800">Send Reward Program Invitations</h3>
+                    <p className="text-sm text-purple-600">Invite selected clients to participate in the program.</p>
+                </div>
+                <Link 
+                    to="/admin/send-invitations"
+                    className="bg-purple-600 text-white px-6 py-2 rounded shadow hover:bg-purple-700 font-medium whitespace-nowrap ml-4"
+                >
+                    Send Invitations
+                </Link>
+            </div>
         </div>
 
         <div className="bg-white rounded shadow overflow-x-auto">

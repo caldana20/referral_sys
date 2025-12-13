@@ -73,6 +73,7 @@ const UserManagement = () => {
              <Link to="/admin/dashboard" className="text-blue-600 hover:underline">Referrals</Link>
              <span className="font-bold text-gray-800">Admins</span>
              <Link to="/admin/clients" className="text-blue-600 hover:underline">Clients</Link>
+             <Link to="/admin/send-invitations" className="text-purple-600 hover:underline">Send Invitations</Link>
             <button onClick={logout} className="text-red-600 hover:text-red-800 ml-4">Logout</button>
         </div>
       </nav>
