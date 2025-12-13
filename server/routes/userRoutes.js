@@ -6,6 +6,7 @@ const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 
 router.post('/import', authenticateToken, requireAdmin, upload.single('file'), userController.importClients);
+router.post('/send-invitations', authenticateToken, requireAdmin, userController.sendInvitations);
 router.get('/validate-client-token', userController.validateClientToken); // Must come before /:clientId route
 router.get('/', authenticateToken, requireAdmin, userController.getUsers);
 router.post('/', authenticateToken, requireAdmin, userController.createUser);

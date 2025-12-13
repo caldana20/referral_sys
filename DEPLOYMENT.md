@@ -148,8 +148,8 @@ Add the following (adjust values as needed):
 ```env
 PORT=5000
 JWT_SECRET=your-super-secret-jwt-key-change-this
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASS=your-app-password
+SENDGRID_API_KEY=SG.your-sendgrid-api-key-here
+SENDGRID_FROM_EMAIL=noreply@yourdomain.com
 CLIENT_URL=https://your-domain.com
 NODE_ENV=production
 ```
@@ -158,6 +158,8 @@ NODE_ENV=production
 - `CLIENT_URL` should be your production domain (e.g., `https://referrals.yourcleaningangels.com`)
 - **DO NOT** use `http://localhost:5173` in production - that's only for development
 - The frontend runs on port 5173 in development, but in production it's built and served via Nginx on port 80/443
+- `SENDGRID_FROM_EMAIL` must be a verified sender email in your SendGrid account
+- Get your SendGrid API key from: SendGrid Dashboard > Settings > API Keys
 
 Save and exit (Ctrl+X, then Y, then Enter)
 

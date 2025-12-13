@@ -73,7 +73,7 @@ const SendInvitations = () => {
     try {
       const token = localStorage.getItem('token');
       const res = await axios.post(
-        '/api/users/bulk-email',
+        '/api/users/send-invitations',
         { clientIds: selectedClients },
         { headers: { Authorization: `Bearer ${token}` } }
       );

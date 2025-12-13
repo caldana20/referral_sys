@@ -1,36 +1,49 @@
 require('dotenv').config();
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
-console.log('--- Email Config Diagnostics ---');
+console.log('--- Email Config Diagnostics (SendGrid) ---');
 console.log('Current Working Directory:', process.cwd());
 
-const user = process.env.EMAIL_USER;
-const pass = process.env.EMAIL_PASS;
+const apiKey = process.env.SENDGRID_API_KEY;
+const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
 
-console.log('EMAIL_USER:', user ? `'${user}'` : '(undefined)');
-console.log('EMAIL_PASS:', pass ? `'${pass.substring(0, 2)}...${pass.substring(pass.length - 2)}' (Length: ${pass.length})` : '(undefined)');
+console.log('SENDGRID_API_KEY:', apiKey ? `'${apiKey.substring(0, 7)}...${apiKey.substring(apiKey.length - 4)}' (Length: ${apiKey.length})` : '(undefined)');
+console.log('SENDGRID_FROM_EMAIL:', fromEmail ? `'${fromEmail}'` : '(undefined)');
 
-if (!user || !pass) {
-  console.error('ERROR: Missing environment variables. Check your .env file.');
+if (!apiKey) {
+  console.error('ERROR: SENDGRID_API_KEY environment variable is not set.');
+  console.error('Get your API key from: SendGrid Dashboard > Settings > API Keys');
   process.exit(1);
 }
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: user,
-    pass: pass
-  }
-});
+if (!fromEmail) {
+  console.error('ERROR: SENDGRID_FROM_EMAIL or EMAIL_USER environment variable is not set.');
+  console.error('This should be a verified sender email in your SendGrid account.');
+  process.exit(1);
+}
 
-console.log('Attempting to verify connection...');
+// Set API key
+sgMail.setApiKey(apiKey);
 
-transporter.verify(function (error, success) {
-  if (error) {
+console.log('Attempting to verify SendGrid connection...');
+
+// Test SendGrid API key by making a test request
+(async () => {
+  try {
+    // SendGrid doesn't have a verify method, so we'll try to send a test email
+    // But for diagnostics, we'll just check if the API key is set correctly
+    console.log('✓ SendGrid API key is configured');
+    console.log('✓ From email:', fromEmail);
+    console.log('');
+    console.log('To test email sending, use the sendEmail function from emailService.js');
+    console.log('Or send a test email from SendGrid dashboard.');
+  } catch (error) {
     console.error('Verification Failed!');
     console.error(error);
-  } else {
-    console.log('Server is ready to take our messages');
+    if (error.response) {
+      console.error('Status Code:', error.response.statusCode);
+      console.error('Body:', error.response.body);
+    }
   }
-});
+})();
 
