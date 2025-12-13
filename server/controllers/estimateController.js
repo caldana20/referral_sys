@@ -123,7 +123,7 @@ exports.createEstimate = async (req, res) => {
 
             sendEmail({
                 to: referrerEmail,
-                subject: 'Your Referral Code was Used! 🎉',
+                subject: 'Your Cleaning Angels Referral Code was Used! 🎉',
                 html: clientEmailHtml
             }).catch(err => console.error('Failed to send referrer confirmation email:', err));
         }

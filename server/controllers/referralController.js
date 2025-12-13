@@ -113,7 +113,7 @@ exports.createReferral = async (req, res) => {
 
             sendEmail({
                 to: adminEmails,
-                subject: 'New Referral Link Generated',
+                subject: 'New Cleaning Angels Referral Link Generated',
                 html: adminEmailHtml
             }).catch(err => console.error('Failed to send admin notification for new referral:', err));
         }

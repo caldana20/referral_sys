@@ -15,7 +15,7 @@ exports.sendEmail = async ({ to, subject, html }) => {
     // Convert array of emails to comma-separated string if needed, 
     // though nodemailer handles arrays in 'to' field well.
     const info = await transporter.sendMail({
-      from: `"Referral System" <${process.env.EMAIL_USER}>`,
+      from: `"Cleaning Angels" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html
