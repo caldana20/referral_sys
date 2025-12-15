@@ -6,6 +6,7 @@ const referralRoutes = require('./routes/referralRoutes');
 const estimateRoutes = require('./routes/estimateRoutes');
 const userRoutes = require('./routes/userRoutes');
 const rewardRoutes = require('./routes/rewardRoutes');
+const tenantRoutes = require('./routes/tenantRoutes');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 require('dotenv').config();
@@ -26,6 +27,7 @@ app.use('/api/referrals', referralRoutes);
 app.use('/api/estimates', estimateRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rewards', rewardRoutes);
+app.use('/api/tenants', tenantRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useParams } from 'react-router-dom';
 
 const CustomerDashboard = () => {
   const [searchParams] = useSearchParams();
+  const { tenantSlug } = useParams();
   const [step, setStep] = useState(1);
   const [rewards, setRewards] = useState([]);
   const [formData, setFormData] = useState({
@@ -20,7 +21,12 @@ const CustomerDashboard = () => {
   useEffect(() => {
     const fetchRewards = async () => {
       try {
-        const res = await axios.get('/api/rewards/active');
+        const slug = tenantSlug || searchParams.get('tenant');
+        if (!slug) {
+          setError('Missing tenant. Please use a valid referral link.');
+          return;
+        }
+        const res = await axios.get('/api/rewards/active', { params: { tenantSlug: slug } });
         const rewardsData = Array.isArray(res.data) ? res.data : [];
         setRewards(rewardsData);
         if (rewardsData.length > 0) {
@@ -76,13 +82,19 @@ const CustomerDashboard = () => {
     setError('');
     
     try {
+      const slug = tenantSlug || searchParams.get('tenant');
+      if (!slug) {
+        setError('Missing tenant. Please use a valid referral link.');
+        return;
+      }
       const payload = {
         ...formData,
-        email: formData.email.toLowerCase()
+        email: formData.email.toLowerCase(),
+        tenantSlug: slug
       };
       const res = await axios.post('/api/referrals', payload);
       const { code } = res.data;
-      setGeneratedLink(`${window.location.origin}/referral/${code}`);
+      setGeneratedLink(`${window.location.origin}/tenant/${slug}/referral/${code}`);
       setStep(2);
     } catch (err) {
       setError(err.response?.data?.message || 'Error generating link');

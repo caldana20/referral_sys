@@ -7,6 +7,14 @@ const Referral = sequelize.define('Referral', {
     primaryKey: true,
     autoIncrement: true
   },
+  tenantId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'Tenants',
+      key: 'id'
+    }
+  },
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -18,7 +26,7 @@ const Referral = sequelize.define('Referral', {
   code: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true
+    unique: 'referral_code_tenant'
   },
   prospectEmail: {
     type: DataTypes.STRING,
@@ -39,7 +47,16 @@ const Referral = sequelize.define('Referral', {
     type: DataTypes.ENUM('Open', 'Wait', 'Closed', 'Expired', 'Used'),
     defaultValue: 'Open'
   }
+}, {
+  indexes: [
+    {
+      unique: true,
+      fields: ['code', 'tenantId'],
+      name: 'referral_code_tenant'
+    }
+  ]
 });
 
 module.exports = Referral;
+
 
