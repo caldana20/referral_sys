@@ -278,6 +278,10 @@ exports.getReferralByCode = async (req, res) => {
     
     const referralData = referral.toJSON();
     referralData.used = referral.Estimates && referral.Estimates.length > 0;
+    referralData.tenant = {
+      name: tenant.name,
+      logoUrl: tenant.logoUrl || null
+    };
     referralData.fieldConfig = getFieldsForTenant(tenant.slug);
 
     res.json(referralData);

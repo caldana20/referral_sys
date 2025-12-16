@@ -107,12 +107,66 @@ exports.confirm = async (req, res) => {
 // Public list for login dropdowns (minimal fields)
 exports.listPublic = async (_req, res) => {
   try {
+    // For compatibility if logoUrl column not yet migrated, avoid selecting it explicitly here.
     const tenants = await Tenant.findAll({
       attributes: ['id', 'name', 'slug']
     });
     res.json(tenants);
   } catch (err) {
     res.status(500).json({ message: 'Failed to list tenants', error: err.message });
+  }
+};
+
+// Authenticated: get current tenant settings
+exports.getSettings = async (req, res) => {
+  try {
+    const tenant = await Tenant.findByPk(req.user.tenantId);
+    if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
+    res.json({
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      logoUrl: tenant.logoUrl,
+      sendgridFromEmail: tenant.sendgridFromEmail
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to load settings', error: err.message });
+  }
+};
+
+// Authenticated: update tenant settings (name, logo)
+exports.updateSettings = async (req, res) => {
+  try {
+    const tenant = await Tenant.findByPk(req.user.tenantId);
+    if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
+    const { name } = req.body;
+    if (name && name.trim() === '') {
+      return res.status(400).json({ message: 'Name cannot be empty' });
+    }
+
+    if (name) {
+      tenant.name = name.trim();
+    }
+
+    if (req.file) {
+      const filePath = req.file.path.replace(/\\/g, '/');
+      const publicUrl = `${req.protocol}://${req.get('host')}/${filePath}`;
+      tenant.logoUrl = publicUrl;
+    }
+
+    await tenant.save();
+
+    res.json({
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      logoUrl: tenant.logoUrl,
+      sendgridFromEmail: tenant.sendgridFromEmail
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update settings', error: err.message });
   }
 };
 

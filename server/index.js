@@ -15,12 +15,16 @@ require('dotenv').config();
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
+if (!fs.existsSync('uploads/tenant-logos')) {
+  fs.mkdirSync('uploads/tenant-logos', { recursive: true });
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/referrals', referralRoutes);

@@ -49,6 +49,10 @@ const Tenant = sequelize.define('Tenant', {
     type: DataTypes.STRING,
     allowNull: true,
     validate: { isEmail: true }
+  },
+  logoUrl: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 });
 
