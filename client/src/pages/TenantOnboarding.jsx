@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 
@@ -17,12 +17,16 @@ const TenantOnboarding = () => {
   const [company, setCompany] = useState({
     name: '',
     phone: '',
+    email: '',
     address: '',
     city: '',
     state: '',
     zip: '',
-    country: ''
+    country: 'US'
   });
+  const [countries, setCountries] = useState([]);
+  const [states, setStates] = useState([]);
+  const [geoLoading, setGeoLoading] = useState(false);
   const [admin, setAdmin] = useState({
     email: '',
     password: ''
@@ -32,10 +36,75 @@ const TenantOnboarding = () => {
   });
   const [result, setResult] = useState(null);
 
+  const getMissingRequired = () => {
+    const missing = [];
+    if (!company.name.trim()) missing.push('companyName');
+    if (!company.email.trim()) missing.push('companyEmail');
+    if (!admin.email.trim()) missing.push('adminEmail');
+    if (!admin.password.trim()) missing.push('adminPassword');
+    return missing;
+  };
+
   const isValidEmail = (value) => /\S+@\S+\.\S+/.test(value);
 
   const nextStep = () => setStep((s) => Math.min(s + 1, steps.length));
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
+
+  const validateStep1 = () => {
+    if (!company.name.trim()) {
+      setError('companyName is required');
+      return false;
+    }
+    if (!company.email.trim()) {
+      setError('companyEmail is required');
+      return false;
+    }
+    if (!isValidEmail(company.email)) {
+      setError('companyEmail is invalid');
+      return false;
+    }
+    return true;
+  };
+
+  const validateStep2 = () => {
+    if (!admin.email.trim()) {
+      setError('adminEmail is required');
+      return false;
+    }
+    if (!isValidEmail(admin.email)) {
+      setError('adminEmail is invalid');
+      return false;
+    }
+    if (!admin.password.trim()) {
+      setError('adminPassword is required');
+      return false;
+    }
+    if (admin.password.length < 6) {
+      setError('adminPassword must be at least 6 characters');
+      return false;
+    }
+    return true;
+  };
+
+  const ensureReadyForConfirm = () => {
+    const missing = getMissingRequired();
+    if (missing.length > 0) {
+      setError(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required`);
+      return false;
+    }
+    return true;
+  };
+
+  const handleStep1Next = () => {
+    if (!validateStep1()) return;
+    handlePreview();
+  };
+
+  const handleStep2Next = () => {
+    if (!validateStep2()) return;
+    setError('');
+    setStep(3);
+  };
 
   const handlePreview = async () => {
     setError('');
@@ -53,18 +122,63 @@ const TenantOnboarding = () => {
     }
   };
 
+  useEffect(() => {
+    const loadCountries = async () => {
+      setGeoLoading(true);
+      try {
+        const res = await axios.get('/api/meta/countries');
+        setCountries(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error('Failed to load countries', err);
+      } finally {
+        setGeoLoading(false);
+      }
+    };
+    loadCountries();
+  }, []);
+
+  useEffect(() => {
+    const loadStates = async () => {
+      if (!company.country) {
+        setStates([]);
+        setCompany((c) => ({ ...c, state: '' }));
+        return;
+      }
+      setGeoLoading(true);
+      try {
+        const res = await axios.get(`/api/meta/countries/${company.country}/states`);
+        setStates(Array.isArray(res.data) ? res.data : []);
+        setCompany((c) => ({ ...c, state: '' }));
+      } catch (err) {
+        console.error('Failed to load states', err);
+        setStates([]);
+        setCompany((c) => ({ ...c, state: '' }));
+      } finally {
+        setGeoLoading(false);
+      }
+    };
+    loadStates();
+  }, [company.country]);
+
   const handleConfirm = async () => {
+    const missing = getMissingRequired();
+    if (missing.length > 0) {
+      setError(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required`);
+      return;
+    }
+
+    if (!preview) {
+      setError('Please complete preview first.');
+      return;
+    }
+
     setError('');
     setLoading(true);
     try {
-      if (!preview) {
-        setError('Please complete preview first.');
-        setLoading(false);
-        return;
-      }
       const res = await axios.post('/api/tenants/confirm', {
-        companyName: company.name,
+        trimmedName: company.name.trim(),
         phone: company.phone,
+        email: company.email,
         address: company.address,
         city: company.city,
         state: company.state,
@@ -95,7 +209,10 @@ const TenantOnboarding = () => {
                 type="text"
                 className="w-full p-2 border rounded"
                 value={company.name}
-                onChange={(e) => setCompany({ ...company, name: e.target.value })}
+                onChange={(e) => {
+                  setError('');
+                  setCompany({ ...company, name: e.target.value });
+                }}
                 required
               />
             </div>
@@ -106,18 +223,36 @@ const TenantOnboarding = () => {
                   type="text"
                   className="w-full p-2 border rounded"
                   value={company.phone}
-                  onChange={(e) => setCompany({ ...company, phone: e.target.value })}
+                  onChange={(e) => {
+                    setError('');
+                    setCompany({ ...company, phone: e.target.value });
+                  }}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company Email</label>
                 <input
-                  type="text"
+                  type="email"
                   className="w-full p-2 border rounded"
-                  value={company.address}
-                  onChange={(e) => setCompany({ ...company, address: e.target.value })}
+                  value={company.email}
+                  onChange={(e) => {
+                    setError('');
+                    setCompany({ ...company, email: e.target.value });
+                  }}
                 />
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded"
+                value={company.address}
+                onChange={(e) => {
+                  setError('');
+                  setCompany({ ...company, address: e.target.value });
+                }}
+              />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -126,17 +261,59 @@ const TenantOnboarding = () => {
                   type="text"
                   className="w-full p-2 border rounded"
                   value={company.city}
-                  onChange={(e) => setCompany({ ...company, city: e.target.value })}
+                  onChange={(e) => {
+                    setError('');
+                    setCompany({ ...company, city: e.target.value });
+                  }}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                <input
-                  type="text"
+                <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                <select
                   className="w-full p-2 border rounded"
-                  value={company.state}
-                  onChange={(e) => setCompany({ ...company, state: e.target.value })}
-                />
+                  value={company.country}
+                  onChange={(e) => {
+                    setError('');
+                    setCompany({ ...company, country: e.target.value });
+                  }}
+                  disabled={geoLoading}
+                >
+                  <option value="">Select country</option>
+                  {countries.map((ct) => (
+                    <option key={ct.code} value={ct.code}>{ct.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                {states.length > 0 ? (
+                  <select
+                    className="w-full p-2 border rounded"
+                    value={company.state}
+                    onChange={(e) => {
+                      setError('');
+                      setCompany({ ...company, state: e.target.value });
+                    }}
+                    disabled={geoLoading}
+                  >
+                    <option value="">Select state</option>
+                    {states.map((st) => (
+                      <option key={st.code} value={st.code}>{st.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded"
+                    value={company.state}
+                    onChange={(e) => {
+                      setError('');
+                      setCompany({ ...company, state: e.target.value });
+                    }}
+                    placeholder="State / Province"
+                    disabled={geoLoading}
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Zip</label>
@@ -144,25 +321,19 @@ const TenantOnboarding = () => {
                   type="text"
                   className="w-full p-2 border rounded"
                   value={company.zip}
-                  onChange={(e) => setCompany({ ...company, zip: e.target.value })}
+                  onChange={(e) => {
+                    setError('');
+                    setCompany({ ...company, zip: e.target.value });
+                  }}
                 />
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-              <input
-                type="text"
-                className="w-full p-2 border rounded"
-                value={company.country}
-                onChange={(e) => setCompany({ ...company, country: e.target.value })}
-              />
             </div>
             <div className="flex justify-end">
               <button
                 type="button"
-                onClick={handlePreview}
+                onClick={handleStep1Next}
                 className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                disabled={loading || !company.name}
+                disabled={loading}
               >
                 {loading ? 'Checking...' : 'Next'}
               </button>
@@ -178,7 +349,10 @@ const TenantOnboarding = () => {
                 type="email"
                 className="w-full p-2 border rounded"
                 value={admin.email}
-                onChange={(e) => setAdmin({ ...admin, email: e.target.value })}
+                onChange={(e) => {
+                  setError('');
+                  setAdmin({ ...admin, email: e.target.value });
+                }}
                 required
               />
             </div>
@@ -188,7 +362,10 @@ const TenantOnboarding = () => {
                 type="password"
                 className="w-full p-2 border rounded"
                 value={admin.password}
-                onChange={(e) => setAdmin({ ...admin, password: e.target.value })}
+                onChange={(e) => {
+                  setError('');
+                  setAdmin({ ...admin, password: e.target.value });
+                }}
                 required
               />
             </div>
@@ -196,9 +373,9 @@ const TenantOnboarding = () => {
               <button type="button" onClick={prevStep} className="px-4 py-2 rounded border">Back</button>
               <button
                 type="button"
-                onClick={() => setStep(3)}
+                onClick={handleStep2Next}
                 className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                disabled={loading || !isValidEmail(admin.email) || !admin.password || admin.password.length < 6}
+                disabled={loading}
               >
                 Next
               </button>
@@ -214,7 +391,10 @@ const TenantOnboarding = () => {
                 type="email"
                 className="w-full p-2 border rounded"
                 value={settings.sendgridFromEmail}
-                onChange={(e) => setSettings({ ...settings, sendgridFromEmail: e.target.value })}
+                onChange={(e) => {
+                  setError('');
+                  setSettings({ ...settings, sendgridFromEmail: e.target.value });
+                }}
               />
             </div>
             {preview && (
@@ -227,9 +407,13 @@ const TenantOnboarding = () => {
               <button type="button" onClick={prevStep} className="px-4 py-2 rounded border">Back</button>
               <button
                 type="button"
-                onClick={() => setStep(4)}
+                onClick={() => {
+                  if (!ensureReadyForConfirm()) return;
+                  setError('');
+                  setStep(4);
+                }}
                 className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                disabled={loading || !preview}
+                disabled={loading || !preview || getMissingRequired().length > 0}
               >
                 Next
               </button>
@@ -266,13 +450,18 @@ const TenantOnboarding = () => {
                 </div>
               </div>
             )}
+            {getMissingRequired().length > 0 && (
+              <div className="text-sm text-red-600">
+                Please fill company name, admin email, and admin password before confirming.
+              </div>
+            )}
             <div className="flex justify-between">
               <button type="button" onClick={prevStep} className="px-4 py-2 rounded border">Back</button>
               <button
                 type="button"
                 onClick={handleConfirm}
                 className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                disabled={loading || !!result}
+                disabled={loading || !!result || getMissingRequired().length > 0 || !preview}
               >
                 {loading ? 'Creating...' : 'Confirm & Create'}
               </button>
@@ -289,7 +478,9 @@ const TenantOnboarding = () => {
       <div className="w-full max-w-3xl bg-white rounded-2xl shadow p-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Tenant Onboarding</h1>
-          <div className="text-sm text-gray-500">Step {step} of {steps.length}: {steps[step - 1].title}</div>
+          <div className="text-sm text-gray-500">
+            Step {step} of {steps.length}: {steps[step - 1].title}
+          </div>
         </div>
 
         {error && <div className="mb-4 bg-red-100 text-red-700 p-3 rounded">{error}</div>}
@@ -301,5 +492,4 @@ const TenantOnboarding = () => {
 };
 
 export default TenantOnboarding;
-
 

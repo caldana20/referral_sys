@@ -15,6 +15,7 @@ import BulkUpload from './pages/BulkUpload';
 import SendInvitations from './pages/SendInvitations';
 import TenantOnboarding from './pages/TenantOnboarding';
 import EstimateDetail from './pages/EstimateDetail';
+import TenantSettings from './pages/TenantSettings';
 
 function App() {
   return (
@@ -73,6 +74,14 @@ function App() {
             element={
               <ProtectedRoute role="admin">
                 <EstimateDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/tenant-settings" 
+            element={
+              <ProtectedRoute role="admin">
+                <TenantSettings />
               </ProtectedRoute>
             } 
           />

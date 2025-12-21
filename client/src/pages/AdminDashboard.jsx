@@ -200,6 +200,7 @@ const AdminDashboard = () => {
             <Link to="/admin/users" className="text-blue-600 hover:underline">Admins</Link>
             <Link to="/admin/clients" className="text-blue-600 hover:underline">Clients</Link>
             <Link to="/admin/send-invitations" className="text-purple-600 hover:underline">Send Invitations</Link>
+            <Link to="/admin/tenant-settings" className="text-blue-600 hover:underline">Tenant Settings</Link>
             <button onClick={logout} className="text-red-600 hover:text-red-800">Logout</button>
         </div>
       </nav>

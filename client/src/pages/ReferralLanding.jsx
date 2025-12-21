@@ -18,6 +18,7 @@ const ReferralLanding = () => {
   });
   const [customFields, setCustomFields] = useState({});
   const [fieldConfig, setFieldConfig] = useState([]);
+  const [tenantInfo, setTenantInfo] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
@@ -35,6 +36,9 @@ const ReferralLanding = () => {
         setReferralData(res.data);
         if (Array.isArray(res.data.fieldConfig)) {
           setFieldConfig(res.data.fieldConfig);
+        }
+        if (res.data.tenant) {
+          setTenantInfo(res.data.tenant);
         }
         if (res.data.used) {
           setUsed(true);
@@ -148,12 +152,21 @@ const ReferralLanding = () => {
         <div className="max-w-4xl w-full flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden">
           
           {/* Left Side: Branding / Image Area */}
-          <div className="md:w-1/2 bg-brand-500 p-10 text-white flex flex-col justify-center">
-            <h2 className="text-4xl font-bold mb-4">Your friend sent you an angel's touch</h2>
+          <div className="md:w-1/2 bg-brand-500 p-10 text-white flex flex-col justify-center relative">
+            <h2 className="text-4xl font-bold mb-4">
+              {tenantInfo?.name ? `${tenantInfo.name} welcomes you` : "You're invited"}
+            </h2>
             <p className="text-brand-100 text-lg mb-8">
               Claim your special offer and get a sparkling clean home.
             </p>
-            {/* Reward Information Removed */}
+            {tenantInfo?.name && (
+              <div className="text-brand-100 text-sm bg-white/10 rounded-lg p-3 inline-flex items-center gap-2">
+                <span className="text-white font-semibold">Referred with</span>
+                <span className="px-2 py-1 bg-white text-brand-600 rounded text-xs font-bold">
+                  {tenantInfo.name}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Right Side: Form or Status Messages */}
