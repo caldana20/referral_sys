@@ -13,17 +13,20 @@ import UserManagement from './pages/UserManagement';
 import ClientManagement from './pages/ClientManagement';
 import BulkUpload from './pages/BulkUpload';
 import SendInvitations from './pages/SendInvitations';
+import TenantOnboarding from './pages/TenantOnboarding';
+import EstimateDetail from './pages/EstimateDetail';
+import TenantSettings from './pages/TenantSettings';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<CustomerDashboard />} />
-          <Route path="/generate-referral" element={<CustomerDashboard />} />
+          {/* Public Routes (subpath only) */}
+          <Route path="/tenant/:tenantSlug/generate-referral" element={<CustomerDashboard />} />
+          <Route path="/tenant/:tenantSlug/referral/:code" element={<ReferralLanding />} />
+          <Route path="/tenant/onboarding" element={<TenantOnboarding />} />
           <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/referral/:code" element={<ReferralLanding />} />
 
           {/* Protected Admin Routes */}
           <Route 
@@ -63,6 +66,22 @@ function App() {
             element={
               <ProtectedRoute role="admin">
                 <SendInvitations />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/estimates/:id" 
+            element={
+              <ProtectedRoute role="admin">
+                <EstimateDetail />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/tenant-settings" 
+            element={
+              <ProtectedRoute role="admin">
+                <TenantSettings />
               </ProtectedRoute>
             } 
           />

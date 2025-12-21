@@ -7,6 +7,14 @@ const Estimate = sequelize.define('Estimate', {
     primaryKey: true,
     autoIncrement: true
   },
+  tenantId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'Tenants',
+      key: 'id'
+    }
+  },
   referralId: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -42,6 +50,10 @@ const Estimate = sequelize.define('Estimate', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  customFields: {
+    type: DataTypes.JSONB,
+    allowNull: true
+  },
   status: {
     type: DataTypes.STRING,
     defaultValue: 'Pending'
@@ -49,4 +61,5 @@ const Estimate = sequelize.define('Estimate', {
 });
 
 module.exports = Estimate;
+
 

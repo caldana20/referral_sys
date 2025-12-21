@@ -7,7 +7,7 @@ if (process.env.SENDGRID_API_KEY) {
   console.warn('Warning: SENDGRID_API_KEY not set. Email functionality will be disabled.');
 }
 
-exports.sendEmail = async ({ to, subject, html }) => {
+exports.sendEmail = async ({ to, subject, html, fromEmail, fromName }) => {
   // Validate API key is set
   if (!process.env.SENDGRID_API_KEY) {
     console.error('Error: SENDGRID_API_KEY environment variable is not set');
@@ -15,11 +15,12 @@ exports.sendEmail = async ({ to, subject, html }) => {
   }
 
   // Validate sender email
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
-  if (!fromEmail) {
+  const resolvedFromEmail = fromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+  if (!resolvedFromEmail) {
     console.error('Error: SENDGRID_FROM_EMAIL or EMAIL_USER environment variable is not set');
     return null;
   }
+  const resolvedFromName = fromName || process.env.COMPANY_NAME || 'Your Company';
 
   try {
     // Convert single email to array if needed
@@ -30,8 +31,8 @@ exports.sendEmail = async ({ to, subject, html }) => {
     const msg = {
       to: recipients,
       from: {
-        email: fromEmail,
-        name: 'Cleaning Angels'
+        email: resolvedFromEmail,
+        name: resolvedFromName
       },
       subject: subject,
       html: html

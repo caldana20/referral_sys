@@ -1,15 +1,24 @@
-const { Estimate, Referral, User } = require('../models');
+const { Estimate, Referral, User, Tenant } = require('../models');
 const { sendEmail } = require('../utils/emailService');
+const { getFieldsForTenant } = require('../config/tenantFields');
 
 exports.createEstimate = async (req, res) => {
-  const { referralCode, name, email, phone, address, city, description } = req.body;
+  const { referralCode, name, email, phone, address, city, description, tenantSlug, customFields = {} } = req.body;
 
   try {
+    if (!tenantSlug) {
+      return res.status(400).json({ message: 'tenantSlug is required' });
+    }
+    const tenant = await require('../models').Tenant.findOne({ where: { slug: tenantSlug } });
+    if (!tenant) return res.status(404).json({ message: 'Invalid tenant' });
+    const companyName = tenant.name || 'Your Company';
+    const fromEmail = tenant.sendgridFromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+
     const referral = await Referral.findOne({ 
-      where: { code: referralCode },
+      where: { code: referralCode, tenantId: tenant.id },
       include: [{ model: User }] // Include referrer info
     });
-    if (!referral) return res.status(404).json({ message: 'Invalid referral code' });
+    if (!referral) return res.status(404).json({ message: 'Invalid referral code for this tenant' });
 
     if (referral.status !== 'Open') {
         return res.status(400).json({ message: 'Referral is no longer active' });
@@ -20,20 +29,73 @@ exports.createEstimate = async (req, res) => {
       return res.status(400).json({ message: 'This referral link has already been used' });
     }
 
+    // Validate and sanitize custom fields
+    const fieldDefs = getFieldsForTenant(tenant.slug);
+    const sanitizedCustomFields = {};
+    const errors = [];
+
+    const cf = customFields && typeof customFields === 'object' ? customFields : {};
+    for (const field of fieldDefs) {
+      const value = cf[field.id];
+      if (field.required && (value === undefined || value === null || `${value}`.trim() === '')) {
+        errors.push(`Field '${field.label}' is required`);
+        continue;
+      }
+
+      if (value === undefined || value === null || `${value}`.trim?.() === '') {
+        continue; // optional empty
+      }
+
+      switch (field.type) {
+        case 'select':
+          if (!field.options || !field.options.includes(value)) {
+            errors.push(`Invalid option for '${field.label}'`);
+          } else {
+            sanitizedCustomFields[field.id] = value;
+          }
+          break;
+        case 'number':
+          if (Number.isNaN(Number(value))) {
+            errors.push(`Field '${field.label}' must be a number`);
+          } else {
+            sanitizedCustomFields[field.id] = Number(value);
+          }
+          break;
+        case 'checkbox':
+          sanitizedCustomFields[field.id] = Boolean(value);
+          break;
+        case 'date':
+          if (isNaN(Date.parse(value))) {
+            errors.push(`Field '${field.label}' must be a valid date`);
+          } else {
+            sanitizedCustomFields[field.id] = value;
+          }
+          break;
+        default:
+          sanitizedCustomFields[field.id] = `${value}`;
+      }
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ message: errors.join('; ') });
+    }
+
     const estimate = await Estimate.create({
       referralId: referral.id,
+      tenantId: referral.tenantId || null,
       name,
       email,
       phone,
       address,
       city,
       description,
+      customFields: sanitizedCustomFields,
       status: 'Pending'
     });
 
     // --- Send Email to Admins ---
     try {
-      const admins = await User.findAll({ where: { role: 'admin' } });
+      const admins = await User.findAll({ where: { role: 'admin', tenantId: referral.tenantId } });
       const adminEmails = admins.map(admin => admin.email);
 
       if (adminEmails.length > 0) {
@@ -61,7 +123,7 @@ exports.createEstimate = async (req, res) => {
             </div>
             
             <div style="margin-top: 20px; font-size: 14px; color: #6b7280; text-align: center;">
-                Cleaning Angels Admin Notification
+                ${companyName} Admin Notification
             </div>
           </div>
         `;
@@ -69,8 +131,10 @@ exports.createEstimate = async (req, res) => {
         // Send email asynchronously
         sendEmail({
           to: adminEmails,
-          subject: 'New Estimate Request Received',
-          html: emailContent
+          subject: `New Estimate Request Received - ${companyName}`,
+          html: emailContent,
+          fromEmail,
+          fromName: companyName
         });
       }
     } catch (emailError) {
@@ -88,7 +152,7 @@ exports.createEstimate = async (req, res) => {
             const clientEmailHtml = `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
                 <div style="text-align: center; margin-bottom: 20px;">
-                  <h2 style="color: #2563eb; margin: 0;">Cleaning Angels</h2>
+                  <h2 style="color: #2563eb; margin: 0;">${companyName}</h2>
                 </div>
                 
                 <div style="text-align: center; background-color: #f0fdf4; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
@@ -116,15 +180,17 @@ exports.createEstimate = async (req, res) => {
                 
                 <div style="margin-top: 30px; pt-20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
                   <p>Thank you for spreading the word!</p>
-                  <p>&copy; ${new Date().getFullYear()} Cleaning Angels. All rights reserved.</p>
+                  <p>&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
                 </div>
               </div>
             `;
 
             sendEmail({
                 to: referrerEmail,
-                subject: 'Your Cleaning Angels Referral Code was Used! 🎉',
-                html: clientEmailHtml
+                subject: `Your ${companyName} Referral Code was Used! 🎉`,
+                html: clientEmailHtml,
+                fromEmail,
+                fromName: companyName
             }).catch(err => console.error('Failed to send referrer confirmation email:', err));
         }
     } catch (clientEmailError) {
@@ -136,7 +202,7 @@ exports.createEstimate = async (req, res) => {
         const prospectEmailHtml = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
             <div style="text-align: center; margin-bottom: 20px;">
-              <h2 style="color: #2563eb; margin: 0;">Cleaning Angels</h2>
+              <h2 style="color: #2563eb; margin: 0;">${companyName}</h2>
             </div>
             
             <div style="text-align: center; background-color: #eff6ff; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
@@ -148,7 +214,7 @@ exports.createEstimate = async (req, res) => {
 
             <div style="color: #4b5563; font-size: 15px; line-height: 1.6;">
               <p>Hi ${name},</p>
-              <p>Thank you for requesting an estimate from Cleaning Angels! We're excited to help make your home sparkle.</p>
+              <p>Thank you for requesting an estimate from ${companyName}! We're excited to help make your home sparkle.</p>
               
               <div style="background-color: #f9fafb; padding: 15px; border-left: 4px solid #2563eb; margin: 20px 0;">
                 <p style="margin: 0 0 8px 0;"><strong>Request Summary:</strong></p>
@@ -178,15 +244,17 @@ exports.createEstimate = async (req, res) => {
             
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
               <p>We look forward to serving you!</p>
-              <p>&copy; ${new Date().getFullYear()} Cleaning Angels. All rights reserved.</p>
+              <p>&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
             </div>
           </div>
         `;
 
         sendEmail({
             to: email,
-            subject: 'Your Estimate Request Has Been Received ✨',
-            html: prospectEmailHtml
+            subject: `Your Estimate Request Has Been Received ✨`,
+            html: prospectEmailHtml,
+            fromEmail,
+            fromName: companyName
         }).catch(err => console.error('Failed to send prospect confirmation email:', err));
     } catch (prospectEmailError) {
         console.error('Failed to trigger prospect email notification:', prospectEmailError);
@@ -203,6 +271,34 @@ exports.createEstimate = async (req, res) => {
     await referral.save();
 
     res.status(201).json(estimate);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get a single estimate with custom fields (admin-only)
+exports.getEstimateById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const estimate = await Estimate.findOne({
+      where: { id, tenantId: req.user.tenantId },
+      include: [
+        { model: Referral, include: [{ model: User, attributes: ['name', 'email'] }] }
+      ]
+    });
+
+    if (!estimate) {
+      return res.status(404).json({ message: 'Estimate not found' });
+    }
+
+    const tenant = await Tenant.findByPk(req.user.tenantId);
+    const fieldConfig = getFieldsForTenant(tenant?.slug);
+
+    res.json({
+      estimate,
+      fieldConfig
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

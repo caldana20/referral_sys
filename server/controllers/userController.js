@@ -1,4 +1,4 @@
-const { User } = require('../models');
+const { User, Tenant } = require('../models');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const csv = require('csv-parser');
@@ -9,7 +9,8 @@ const jwt = require('jsonwebtoken');
 exports.getUsers = async (req, res) => {
   try {
     const { role } = req.query;
-    const whereClause = role ? { role } : {};
+    const whereClause = { tenantId: req.user.tenantId };
+    if (role) whereClause.role = role;
     
     const users = await User.findAll({
       where: whereClause,
@@ -23,10 +24,11 @@ exports.getUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   const { name, email, password, role, phone } = req.body;
-  console.log('Creating user:', { name, email, role, phone });
+  const normalizedEmail = (email || '').toLowerCase().trim();
+  console.log('Creating user:', { name, email: normalizedEmail, role, phone });
 
   try {
-    const existingUser = await User.findOne({ where: { email } });
+    const existingUser = await User.findOne({ where: { email: normalizedEmail, tenantId: req.user.tenantId } });
     if (existingUser) {
       return res.status(400).json({ message: 'User with this email already exists' });
     }
@@ -45,10 +47,11 @@ exports.createUser = async (req, res) => {
 
     const user = await User.create({
       name,
-      email,
+      email: normalizedEmail,
       password_hash: passwordHash,
       role: role || 'client',
-      phone
+      phone,
+      tenantId: req.user.tenantId
     });
 
     const userResponse = user.toJSON();
@@ -66,7 +69,7 @@ exports.deleteUser = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const user = await User.findByPk(id);
+    const user = await User.findOne({ where: { id, tenantId: req.user.tenantId } });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (user.id === req.user.id) {
@@ -122,7 +125,7 @@ exports.importClients = async (req, res) => {
 
         try {
             const normalizedEmail = email.toLowerCase().trim();
-            const existingUser = await User.findOne({ where: { email: normalizedEmail } });
+            const existingUser = await User.findOne({ where: { email: normalizedEmail, tenantId: req.user.tenantId } });
             
             if (!existingUser) {
                 await User.create({
@@ -130,7 +133,8 @@ exports.importClients = async (req, res) => {
                     email: normalizedEmail,
                     phone: phone || null,
                     role: 'client',
-                    password_hash: null 
+                    password_hash: null,
+                    tenantId: req.user.tenantId
                 });
                 importedCount++;
             } else {
@@ -162,10 +166,21 @@ exports.sendInvitations = async (req, res) => {
   }
 
   try {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ message: 'Missing tenant context' });
+    }
+
+    const tenant = await Tenant.findByPk(tenantId);
+    if (!tenant) {
+      return res.status(404).json({ message: 'Tenant not found' });
+    }
+
     const clients = await User.findAll({
       where: {
         id: clientIds,
-        role: 'client'
+        role: 'client',
+        tenantId
       }
     });
 
@@ -173,7 +188,10 @@ exports.sendInvitations = async (req, res) => {
       return res.status(404).json({ message: 'No valid clients found' });
     }
 
-    const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const companyName = tenant.name || 'Your Company';
+    const fromEmail = tenant.sendgridFromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    // clientUrl already includes slug (e.g., http://localhost:5173/tenant/<slug>)
+    const baseUrl = tenant.clientUrl || process.env.CLIENT_URL || 'http://localhost:5173/tenant';
 
     let sentCount = 0;
     let failedCount = 0;
@@ -187,6 +205,8 @@ exports.sendInvitations = async (req, res) => {
             clientId: client.id,
             clientEmail: client.email,
             clientName: client.name,
+            tenantId,
+            tenantSlug: tenant.slug,
             type: 'client_referral_link'
           },
           process.env.JWT_SECRET || 'secret_key',
@@ -194,12 +214,12 @@ exports.sendInvitations = async (req, res) => {
         );
 
         // Create personalized link that will pre-fill their information
-        const personalizedLink = `${baseUrl}/generate-referral?token=${token}`;
+        const personalizedLink = `${baseUrl.replace(/\/$/, '')}/generate-referral?token=${token}`;
 
         const emailHtml = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
             <div style="text-align: center; margin-bottom: 20px;">
-              <h2 style="color: #2563eb; margin: 0;">Cleaning Angels</h2>
+              <h2 style="color: #2563eb; margin: 0;">${companyName}</h2>
             </div>
             
             <div style="text-align: center; background-color: #eff6ff; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
@@ -211,7 +231,7 @@ exports.sendInvitations = async (req, res) => {
 
             <div style="color: #4b5563; font-size: 15px; line-height: 1.6;">
               <p>Hi ${client.name},</p>
-              <p>We're excited to introduce our <strong>Referral Reward Program</strong>! As a valued client, you can now earn amazing rewards simply by sharing Cleaning Angels with your friends and family.</p>
+              <p>We're excited to introduce our <strong>Referral Reward Program</strong>! As a valued client, you can now earn amazing rewards simply by sharing ${companyName} with your friends and family.</p>
               
               <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #22c55e;">
                 <h3 style="color: #166534; margin-top: 0;">How It Works:</h3>
@@ -234,16 +254,18 @@ exports.sendInvitations = async (req, res) => {
             </div>
             
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
-              <p>Thank you for being a valued Cleaning Angels client!</p>
-              <p>&copy; ${new Date().getFullYear()} Cleaning Angels. All rights reserved.</p>
+              <p>Thank you for being a valued ${companyName} client!</p>
+              <p>&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
             </div>
           </div>
         `;
 
         await sendEmail({
           to: client.email,
-          subject: 'Start Earning Rewards with Cleaning Angels! 🎁',
-          html: emailHtml
+          subject: `Start Earning Rewards with ${companyName}! 🎁`,
+          html: emailHtml,
+          fromEmail,
+          fromName: companyName
         });
 
         sentCount++;
@@ -279,20 +301,27 @@ exports.generateClientReferralLink = async (req, res) => {
       return res.status(400).json({ message: 'User is not a client' });
     }
 
+    const tenant = await Tenant.findByPk(client.tenantId);
+    if (!tenant) {
+      return res.status(404).json({ message: 'Tenant not found' });
+    }
+
     // Generate a JWT token that expires in 30 days
     const token = jwt.sign(
       { 
         clientId: client.id,
         clientEmail: client.email,
         clientName: client.name,
+        tenantId: tenant.id,
+        tenantSlug: tenant.slug,
         type: 'client_referral_link'
       },
       process.env.JWT_SECRET || 'secret_key',
       { expiresIn: '30d' }
     );
 
-    const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-    const referralLink = `${baseUrl}/generate-referral?token=${token}`;
+    const baseUrl = tenant.clientUrl || process.env.CLIENT_URL || 'http://localhost:5173/tenant';
+    const referralLink = `${baseUrl.replace(/\/$/, '')}/generate-referral?token=${token}`;
 
     res.json({
       link: referralLink,

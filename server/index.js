@@ -6,6 +6,8 @@ const referralRoutes = require('./routes/referralRoutes');
 const estimateRoutes = require('./routes/estimateRoutes');
 const userRoutes = require('./routes/userRoutes');
 const rewardRoutes = require('./routes/rewardRoutes');
+const tenantRoutes = require('./routes/tenantRoutes');
+const metaRoutes = require('./routes/metaRoutes');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 require('dotenv').config();
@@ -14,18 +16,24 @@ require('dotenv').config();
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
+if (!fs.existsSync('uploads/tenant-logos')) {
+  fs.mkdirSync('uploads/tenant-logos', { recursive: true });
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/estimates', estimateRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rewards', rewardRoutes);
+app.use('/api/tenants', tenantRoutes);
+app.use('/api/meta', metaRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

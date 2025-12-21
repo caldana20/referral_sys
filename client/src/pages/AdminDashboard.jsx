@@ -15,12 +15,28 @@ const AdminDashboard = () => {
   const [newReward, setNewReward] = useState('');
   const [rewardError, setRewardError] = useState('');
 
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const [tenantName, setTenantName] = useState('');
 
   useEffect(() => {
     fetchReferrals();
     fetchRewards();
   }, []);
+
+  useEffect(() => {
+    const fetchTenantName = async () => {
+      if (!user?.tenantSlug) return;
+      try {
+        const res = await axios.get('/api/tenants/list-public');
+        const tenants = Array.isArray(res.data) ? res.data : [];
+        const match = tenants.find((t) => t.slug === user.tenantSlug);
+        if (match) setTenantName(match.name);
+      } catch (err) {
+        console.error('Failed to load tenant info', err);
+      }
+    };
+    fetchTenantName();
+  }, [user?.tenantSlug]);
 
   useEffect(() => {
     applyFilterAndSort();
@@ -177,11 +193,14 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white shadow p-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">Admin Dashboard</h1>
+        <h1 className="text-xl font-bold">
+          Admin Dashboard{tenantName ? ` — ${tenantName}` : ''}
+        </h1>
         <div className="space-x-4">
             <Link to="/admin/users" className="text-blue-600 hover:underline">Admins</Link>
             <Link to="/admin/clients" className="text-blue-600 hover:underline">Clients</Link>
             <Link to="/admin/send-invitations" className="text-purple-600 hover:underline">Send Invitations</Link>
+            <Link to="/admin/tenant-settings" className="text-blue-600 hover:underline">Tenant Settings</Link>
             <button onClick={logout} className="text-red-600 hover:text-red-800">Logout</button>
         </div>
       </nav>
@@ -283,6 +302,7 @@ const AdminDashboard = () => {
                             <th className="p-2 cursor-pointer hover:bg-gray-100 whitespace-nowrap" onClick={() => handleSort('estimateDate')}>
                                 Est. Date {sortConfig.key === 'estimateDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
+                            <th className="p-2 whitespace-nowrap">Estimate Link</th>
                             <th className="p-2 cursor-pointer hover:bg-gray-100 whitespace-nowrap" onClick={() => handleSort('status')}>
                                 Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
@@ -338,6 +358,18 @@ const AdminDashboard = () => {
                                     {ref.Estimates && ref.Estimates.length > 0 ? 
                                         new Date(ref.Estimates[0].createdAt).toLocaleDateString() : 
                                         '-'}
+                                </td>
+                                <td className="p-2">
+                                    {ref.Estimates && ref.Estimates.length > 0 ? (
+                                        <Link 
+                                          to={`/admin/estimates/${ref.Estimates[0].id}`}
+                                          className="text-blue-600 hover:underline text-xs"
+                                        >
+                                          View Estimate
+                                        </Link>
+                                    ) : (
+                                        <span className="text-gray-400 text-xs">-</span>
+                                    )}
                                 </td>
                                 <td className="p-2">
                                     <span className={`px-2 py-1 rounded text-xs font-bold 
