@@ -1,13 +1,23 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { User } = require('../models');
+const { User, Tenant } = require('../models');
 require('dotenv').config();
 
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, tenantSlug } = req.body;
 
   try {
-    const user = await User.findOne({ where: { email } });
+    if (!tenantSlug) {
+      return res.status(400).json({ message: 'tenantSlug is required' });
+    }
+
+    const tenant = await Tenant.findOne({ where: { slug: tenantSlug } });
+    if (!tenant) {
+      return res.status(401).json({ message: 'Invalid tenant' });
+    }
+
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    const user = await User.findOne({ where: { email: normalizedEmail, tenantId: tenant.id } });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -21,8 +31,22 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET || 'secret_key', { expiresIn: '1h' });
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    const token = jwt.sign(
+      { id: user.id, role: user.role, tenantId: tenant.id, tenantSlug: tenant.slug },
+      process.env.JWT_SECRET || 'secret_key',
+      { expiresIn: '1h' }
+    );
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        tenantId: tenant.id,
+        tenantSlug: tenant.slug
+      }
+    });
 
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

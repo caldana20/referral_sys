@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 
 const ReferralLanding = () => {
-  const { code } = useParams();
+  const { code, tenantSlug } = useParams();
   const [valid, setValid] = useState(null);
   const [loading, setLoading] = useState(true);
   const [used, setUsed] = useState(false);
@@ -16,15 +16,30 @@ const ReferralLanding = () => {
     city: '',
     description: ''
   });
+  const [customFields, setCustomFields] = useState({});
+  const [fieldConfig, setFieldConfig] = useState([]);
+  const [tenantInfo, setTenantInfo] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const checkCode = async () => {
       try {
-        const res = await axios.get(`/api/referrals/code/${code}`);
+        if (!tenantSlug) {
+          setValid(false);
+          return;
+        }
+        const res = await axios.get(`/api/referrals/code/${code}`, {
+          params: { tenantSlug }
+        });
         setValid(true);
         setReferralData(res.data);
+        if (Array.isArray(res.data.fieldConfig)) {
+          setFieldConfig(res.data.fieldConfig);
+        }
+        if (res.data.tenant) {
+          setTenantInfo(res.data.tenant);
+        }
         if (res.data.used) {
           setUsed(true);
         }
@@ -35,7 +50,7 @@ const ReferralLanding = () => {
       }
     };
     checkCode();
-  }, [code]);
+  }, [code, tenantSlug]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -46,7 +61,9 @@ const ReferralLanding = () => {
     try {
       await axios.post('/api/estimates', {
         referralCode: code,
-        ...formData
+        tenantSlug,
+        ...formData,
+        customFields
       });
       setSubmitted(true);
     } catch (err) {
@@ -60,33 +77,96 @@ const ReferralLanding = () => {
   if (loading) return <div className="text-center p-10">Loading...</div>;
   if (valid === false) return <div className="text-center p-10 text-red-600 text-xl">Invalid or expired referral link.</div>;
 
+  const renderField = (field) => {
+    const value = customFields[field.id] ?? '';
+    const commonProps = {
+      id: field.id,
+      name: field.id,
+      required: field.required,
+      value,
+      onChange: (e) => setCustomFields({ ...customFields, [field.id]: e.target.value })
+    };
+
+    switch (field.type) {
+      case 'textarea':
+        return (
+          <textarea
+            {...commonProps}
+            rows="3"
+            className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+          />
+        );
+      case 'select':
+        return (
+          <select
+            {...commonProps}
+            className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+          >
+            <option value="">Select...</option>
+            {(field.options || []).map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        );
+      case 'checkbox':
+        return (
+          <input
+            type="checkbox"
+            id={field.id}
+            name={field.id}
+            checked={Boolean(customFields[field.id])}
+            onChange={(e) => setCustomFields({ ...customFields, [field.id]: e.target.checked })}
+            className="h-4 w-4 text-brand-600 border-gray-300 rounded"
+          />
+        );
+      case 'date':
+        return (
+          <input
+            type="date"
+            {...commonProps}
+            className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+          />
+        );
+      case 'number':
+        return (
+          <input
+            type="number"
+            {...commonProps}
+            className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+          />
+        );
+      default:
+        return (
+          <input
+            type={field.type || 'text'}
+            {...commonProps}
+            className="w-full border-gray-300 bg-gray-50 border p-3 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+          />
+        );
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-green-50 flex flex-col">
+    <div className="min-h-screen bg-brand-50 flex flex-col">
       <main className="flex-grow flex items-center justify-center p-4">
-        <div className="max-w-4xl w-full flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden border border-red-100">
+        <div className="max-w-4xl w-full flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden">
           
           {/* Left Side: Branding / Image Area */}
           <div className="md:w-1/2 bg-brand-500 p-10 text-white flex flex-col justify-center relative">
-            <div className="absolute top-6 right-6 bg-red-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow">
-              Holiday Offer
-            </div>
-            <div className="flex justify-center mb-6">
-              <img
-                src="/yourcleaningangels-logo.png"
-                alt="YourCleaningAngels.com"
-                className="h-24 md:h-28 w-auto drop-shadow"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </div>
-            <h2 className="text-4xl font-bold mb-4">Your friend sent you an angel's touch</h2>
+            <h2 className="text-4xl font-bold mb-4">
+              {tenantInfo?.name ? `${tenantInfo.name} welcomes you` : "You're invited"}
+            </h2>
             <p className="text-brand-100 text-lg mb-8">
-              Claim your special holiday offer and get a sparkling clean home.
+              Claim your special offer and get a sparkling clean home.
             </p>
-            <div className="text-sm text-brand-50 bg-white/10 border border-white/20 rounded-lg px-4 py-3 w-fit shadow">
-              🎁 Festive cleaning, made easy.
-            </div>
+            {tenantInfo?.name && (
+              <div className="text-brand-100 text-sm bg-white/10 rounded-lg p-3 inline-flex items-center gap-2">
+                <span className="text-white font-semibold">Referred with</span>
+                <span className="px-2 py-1 bg-white text-brand-600 rounded text-xs font-bold">
+                  {tenantInfo.name}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Right Side: Form or Status Messages */}
@@ -107,11 +187,8 @@ const ReferralLanding = () => {
                 </div>
             ) : (
                 <>
-                    <div className="mb-6">
-                      <h1 className="text-2xl font-bold text-gray-800">Request an Estimate</h1>
-                      <div className="mt-2 h-1 w-16 bg-red-200 rounded" />
-                      <p className="text-gray-600 mt-4">Fill out the form below to get started.</p>
-                    </div>
+                    <h1 className="text-2xl font-bold text-gray-800 mb-6">Request an Estimate</h1>
+                    <p className="text-gray-600 mb-6">Fill out the form below to get started.</p>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
@@ -168,6 +245,22 @@ const ReferralLanding = () => {
                                 value={formData.description} onChange={handleChange}
                             ></textarea>
                         </div>
+
+                        {fieldConfig.length > 0 && (
+                          <div className="space-y-4">
+                            {fieldConfig.map((field) => (
+                              <div key={field.id}>
+                                <label htmlFor={field.id} className="block text-sm font-medium text-gray-700 mb-1">
+                                  {field.label} {field.required ? '*' : ''}
+                                </label>
+                                {renderField(field)}
+                                {field.helperText && (
+                                  <p className="text-xs text-gray-500 mt-1">{field.helperText}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
                         {error && <p className="text-red-500 text-sm">{error}</p>}
 

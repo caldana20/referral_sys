@@ -7,10 +7,18 @@ const User = sequelize.define('User', {
     primaryKey: true,
     autoIncrement: true
   },
+  tenantId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'Tenants',
+      key: 'id'
+    }
+  },
   email: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
+    unique: 'user_email_tenant',
     validate: {
       isEmail: true
     }
@@ -31,7 +39,16 @@ const User = sequelize.define('User', {
     type: DataTypes.ENUM('admin', 'client'),
     defaultValue: 'client'
   }
+}, {
+  indexes: [
+    {
+      unique: true,
+      fields: ['email', 'tenantId'],
+      name: 'user_email_tenant'
+    }
+  ]
 });
 
 module.exports = User;
+
 

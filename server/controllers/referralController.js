@@ -1,31 +1,50 @@
-const { Referral, User, Estimate } = require('../models');
+const { Referral, User, Estimate, Tenant } = require('../models');
 const crypto = require('crypto');
 const { sendEmail } = require('../utils/emailService');
+const { getFieldsForTenant } = require('../config/tenantFields');
 
 exports.createReferral = async (req, res) => {
   // Client identifies themselves
-  const { email, name, selectedReward, prospectName, prospectEmail } = req.body;
+  const { email, name, selectedReward, prospectName, prospectEmail, tenantSlug } = req.body;
   console.log('Creating referral request:', req.body);
 
   try {
-    // Check if client exists
-    // Ensure we query case-insensitively if needed, but here we assume email is stored lowercase
+    if (!tenantSlug) {
+      return res.status(400).json({ message: 'tenantSlug is required' });
+    }
+    const tenant = await Tenant.findOne({ where: { slug: tenantSlug } });
+    if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
+    const companyName = tenant.name || 'Your Company';
+    const fromEmail = tenant.sendgridFromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+
+    // Check if client exists in this tenant
     const normalizedEmail = email ? email.toLowerCase() : '';
-    
-    let user = await User.findOne({ where: { email: normalizedEmail } });
-    
+    let user = await User.findOne({ where: { email: normalizedEmail, tenantId: tenant.id } });
     if (!user) {
-        console.log('Client not found for email:', normalizedEmail);
-        return res.status(404).json({ message: 'Client not found. Please contact support.' });
+      console.log('Client not found for email:', normalizedEmail);
+      return res.status(404).json({ message: 'Client not found. Please contact support.' });
     }
 
     console.log('Found user:', user.id);
     
-    // Generate unique code
-    const code = crypto.randomBytes(4).toString('hex');
+    // Generate unique code per tenant
+    let code;
+    for (let i = 0; i < 5; i++) {
+      const candidate = crypto.randomBytes(4).toString('hex');
+      const existing = await Referral.findOne({ where: { code: candidate, tenantId: user.tenantId } });
+      if (!existing) {
+        code = candidate;
+        break;
+      }
+    }
+    if (!code) {
+      return res.status(500).json({ message: 'Failed to generate referral code' });
+    }
 
     const referralData = {
       userId: user.id,
+      tenantId: tenant.id,
       code,
       selectedReward,
       status: 'Open'
@@ -39,15 +58,15 @@ exports.createReferral = async (req, res) => {
     console.log('Referral created:', referral.id);
 
     // Send confirmation email to the client
-    const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-    const referralLink = `${baseUrl}/referral/${code}`;
+    const baseUrl = tenant.clientUrl || process.env.CLIENT_URL || 'http://localhost:5173';
+    const referralLink = `${baseUrl.replace(/\/$/, '')}/referral/${code}`;
     
     // --- Send Email to Client ---
-    const clientEmailSubject = 'Your Cleaning Angels Referral Link is Ready! ✨';
+    const clientEmailSubject = `Your ${companyName} Referral Link is Ready! ✨`;
     const clientEmailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
         <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #2563eb; margin: 0;">Cleaning Angels</h2>
+          <h2 style="color: #2563eb; margin: 0;">${companyName}</h2>
         </div>
         
         <div style="text-align: center; background-color: #f0f9ff; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
@@ -72,7 +91,7 @@ exports.createReferral = async (req, res) => {
         </div>
         
         <div style="margin-top: 30px; pt-20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
-          <p>&copy; ${new Date().getFullYear()} Cleaning Angels. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
         </div>
       </div>
     `;
@@ -81,12 +100,14 @@ exports.createReferral = async (req, res) => {
     sendEmail({
       to: user.email,
       subject: clientEmailSubject,
-      html: clientEmailHtml
+      html: clientEmailHtml,
+      fromEmail,
+      fromName: companyName
     }).catch(err => console.error('Failed to send referral confirmation email to client:', err));
 
     // --- Send Email to Admins ---
     try {
-        const admins = await User.findAll({ where: { role: 'admin' } });
+        const admins = await User.findAll({ where: { role: 'admin', tenantId: user.tenantId } });
         const adminEmails = admins.map(a => a.email);
 
         if (adminEmails.length > 0) {
@@ -106,15 +127,17 @@ exports.createReferral = async (req, res) => {
                 </div>
                 
                 <div style="margin-top: 20px; font-size: 14px; color: #6b7280; text-align: center;">
-                    Cleaning Angels Admin Notification
+                    ${companyName} Admin Notification
                 </div>
               </div>
             `;
 
             sendEmail({
                 to: adminEmails,
-                subject: 'New Cleaning Angels Referral Link Generated',
-                html: adminEmailHtml
+                subject: `New ${companyName} Referral Link Generated`,
+                html: adminEmailHtml,
+                fromEmail,
+                fromName: companyName
             }).catch(err => console.error('Failed to send admin notification for new referral:', err));
         }
     } catch (adminErr) {
@@ -132,9 +155,10 @@ exports.createReferral = async (req, res) => {
 exports.getReferrals = async (req, res) => {
   try {
     const referrals = await Referral.findAll({
+      where: { tenantId: req.user.tenantId },
       include: [
         { model: User, attributes: ['name', 'email'] },
-        { model: Estimate, attributes: ['id', 'createdAt', 'name', 'email'], required: false } // Include id, creation date, name, and email
+        { model: Estimate, attributes: ['id', 'createdAt', 'name', 'email', 'customFields'], required: false }
       ],
       order: [['createdAt', 'DESC']]
     });
@@ -156,10 +180,15 @@ exports.updateReferralStatus = async (req, res) => {
   const { status } = req.body;
 
   try {
-    const referral = await Referral.findByPk(id, {
+    const referral = await Referral.findOne({
+      where: { id, tenantId: req.user.tenantId },
       include: [{ model: User }]
     });
     if (!referral) return res.status(404).json({ message: 'Referral not found' });
+
+    const tenant = await Tenant.findByPk(req.user.tenantId);
+    const companyName = tenant?.name || 'Your Company';
+    const fromEmail = tenant?.sendgridFromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
 
     const previousStatus = referral.status;
     referral.status = status;
@@ -171,7 +200,7 @@ exports.updateReferralStatus = async (req, res) => {
         const clientEmailHtml = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
             <div style="text-align: center; margin-bottom: 20px;">
-              <h2 style="color: #2563eb; margin: 0;">Cleaning Angels</h2>
+              <h2 style="color: #2563eb; margin: 0;">${companyName}</h2>
             </div>
             
             <div style="text-align: center; background-color: #f0fdf4; padding: 30px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
@@ -196,23 +225,25 @@ exports.updateReferralStatus = async (req, res) => {
 
               <div style="background-color: #eff6ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
                 <h3 style="color: #1e40af; margin-top: 0;">What This Means:</h3>
-                <p style="margin: 0; color: #374151;">Your reward is now active and ready to use! Thank you for referring friends to Cleaning Angels. We truly appreciate your support.</p>
+                <p style="margin: 0; color: #374151;">Your reward is now active and ready to use! Thank you for referring friends to ${companyName}. We truly appreciate your support.</p>
               </div>
 
               <p style="margin-top: 20px;">If you have any questions about your reward or need assistance, please don't hesitate to contact us.</p>
             </div>
             
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
-              <p>Thank you for being a valued Cleaning Angels client!</p>
-              <p>&copy; ${new Date().getFullYear()} Cleaning Angels. All rights reserved.</p>
+              <p>Thank you for being a valued ${companyName} client!</p>
+              <p>&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
             </div>
           </div>
         `;
 
         await sendEmail({
           to: referral.User.email,
-          subject: 'Your Cleaning Angels Reward Has Been Activated! 🎉',
-          html: clientEmailHtml
+          subject: `Your ${companyName} Reward Has Been Activated! 🎉`,
+          html: clientEmailHtml,
+          fromEmail,
+          fromName: companyName
         });
 
         console.log(`Reward closure email sent to ${referral.User.email} for referral ${referral.code}`);
@@ -231,14 +262,27 @@ exports.updateReferralStatus = async (req, res) => {
 exports.getReferralByCode = async (req, res) => {
   const { code } = req.params;
   try {
+    const { tenantSlug } = req.query;
+    if (!tenantSlug) {
+      return res.status(400).json({ message: 'tenantSlug is required' });
+    }
+
+    const tenant = await Tenant.findOne({ where: { slug: tenantSlug } });
+    if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
     const referral = await Referral.findOne({ 
-      where: { code },
+      where: { code, tenantId: tenant.id },
       include: [{ model: Estimate }]
     });
     if (!referral) return res.status(404).json({ message: 'Invalid referral code' });
     
     const referralData = referral.toJSON();
     referralData.used = referral.Estimates && referral.Estimates.length > 0;
+    referralData.tenant = {
+      name: tenant.name,
+      logoUrl: tenant.logoUrl || null
+    };
+    referralData.fieldConfig = getFieldsForTenant(tenant.slug);
 
     res.json(referralData);
   } catch (error) {
