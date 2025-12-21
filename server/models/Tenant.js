@@ -50,6 +50,11 @@ const Tenant = sequelize.define('Tenant', {
     allowNull: true,
     validate: { isEmail: true }
   },
+  email: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: { isEmail: true }
+  },
   logoUrl: {
     type: DataTypes.STRING,
     allowNull: true

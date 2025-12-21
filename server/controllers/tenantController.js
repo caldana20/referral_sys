@@ -32,6 +32,7 @@ exports.confirm = async (req, res) => {
   const {
     trimmedName,
     phone,
+    email,
     address,
     city,
     state,
@@ -63,6 +64,7 @@ exports.confirm = async (req, res) => {
     const tenant = await Tenant.create({
       name: trimmedName,
       phone,
+      email,
       address,
       city,
       state,
