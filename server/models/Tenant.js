@@ -58,6 +58,11 @@ const Tenant = sequelize.define('Tenant', {
   logoUrl: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  estimateFieldConfig: {
+    // JSON array of field definitions per tenant
+    type: DataTypes.JSON,
+    allowNull: true
   }
 });
 

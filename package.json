@@ -2,10 +2,13 @@
   "name": "referral-system",
   "version": "1.0.0",
   "scripts": {
-    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "start": "concurrently \"npm run server\" \"npm run next\"",
+    "dev": "concurrently \"npm run server\" \"npm run next\"",
     "server": "cd server && npm start",
-    "client": "cd client && npm run dev",
-    "install-all": "npm install && cd server && npm install && cd ../client && npm install"
+    "next": "cd next-app && npm run dev",
+    "install-all": "npm install && cd server && npm install && cd ../next-app && npm install",
+    "next-build": "cd next-app && npm run build",
+    "next-start": "cd next-app && npm run start"
   },
   "dependencies": {
     "concurrently": "^8.2.2"

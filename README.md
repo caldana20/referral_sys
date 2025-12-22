@@ -1,37 +1,27 @@
-# referral_sys
+# Referral System (Next.js frontend + Express API)
 
-## Email Notifications Setup
+## Run the app (Next-only)
+- Install deps: `npm run install-all` (root). This installs root + server + next-app.
+- Start dev (Next + API): `npm run dev` (root) — runs Express on 5000 and Next on 3000.
+- Next standalone: `cd next-app && npm run dev`
+- Build/start Next (prod): `cd next-app && npm run build && npm run start`
 
-This project uses **SendGrid** for sending transactional emails. SendGrid provides better deliverability, higher sending limits, and detailed analytics compared to SMTP-based solutions.
+## Environment
+- Server: set in `server/.env` (includes DB, JWT, SENDGRID, `CLIENT_URL_BASE=http://localhost:3000`)
+- Next: set in `next-app/.env.local`
+  - `NEXT_PUBLIC_API_BASE_URL=http://localhost:5000`
 
-### SendGrid Setup
+## Removed legacy Vite client
+- The old `client/` app is no longer used. All frontend is in `next-app/`.
 
-1. **Create a SendGrid Account**
-   - Go to [sendgrid.com](https://sendgrid.com) and sign up for a free account
-   - Free tier includes 100 emails/day (perfect for starting)
-
-2. **Verify Your Sender Email**
-   - In SendGrid dashboard, go to **Settings** > **Sender Authentication**
-   - Verify your sender email address (e.g., `noreply@yourdomain.com`)
-   - This is the email address that will appear as the sender
-
-3. **Generate API Key**
-   - Go to **Settings** > **API Keys**
-   - Click **Create API Key**
-   - Name it (e.g., "Cleaning Angels Production")
-   - Select **Full Access** or **Restricted Access** with Mail Send permissions
-   - Copy the API key (you'll only see it once!)
-
-4. **Configure Environment Variables**
-   - Create a `.env` file in the `server` directory if it doesn't exist
-   - Add the following variables:
-
-```env
+## Email Notifications Setup (SendGrid)
+1) Create a SendGrid account and verify a sender (Settings → Sender Authentication).
+2) Generate an API key (Settings → API Keys).
+3) In `server/.env`:
+```
 SENDGRID_API_KEY=SG.your-api-key-here
 SENDGRID_FROM_EMAIL=noreply@yourdomain.com
 ```
-
-**Note:** 
-- `SENDGRID_FROM_EMAIL` must be a verified sender in your SendGrid account
-- You can also use `EMAIL_USER` as a fallback for the sender email (for backward compatibility)
-- The API key starts with `SG.` - make sure to include the full key
+Notes:
+- `SENDGRID_FROM_EMAIL` must be a verified sender.
+- `EMAIL_USER` can be used as a fallback for sender email.

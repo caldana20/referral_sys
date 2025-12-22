@@ -58,8 +58,10 @@ exports.createReferral = async (req, res) => {
     console.log('Referral created:', referral.id);
 
     // Send confirmation email to the client
-    const baseUrl = tenant.clientUrl || process.env.CLIENT_URL || 'http://localhost:5173';
-    const referralLink = `${baseUrl.replace(/\/$/, '')}/referral/${code}`;
+    // Always prefer the configured host for new UI (ignore stored legacy URLs)
+    const hostBase = (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const clientBase = `${hostBase}/tenant/${tenant.slug}`;
+    const referralLink = `${clientBase.replace(/\/$/, '')}/referral/${code}`;
     
     // --- Send Email to Client ---
     const clientEmailSubject = `Your ${companyName} Referral Link is Ready! ✨`;
@@ -282,7 +284,7 @@ exports.getReferralByCode = async (req, res) => {
       name: tenant.name,
       logoUrl: tenant.logoUrl || null
     };
-    referralData.fieldConfig = getFieldsForTenant(tenant.slug);
+    referralData.fieldConfig = tenant.estimateFieldConfig || getFieldsForTenant(tenant.slug);
 
     res.json(referralData);
   } catch (error) {
