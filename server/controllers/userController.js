@@ -190,8 +190,9 @@ exports.sendInvitations = async (req, res) => {
 
     const companyName = tenant.name || 'Your Company';
     const fromEmail = tenant.sendgridFromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
-    // clientUrl already includes slug (e.g., http://localhost:5173/tenant/<slug>)
-    const baseUrl = tenant.clientUrl || process.env.CLIENT_URL || 'http://localhost:5173/tenant';
+    // Always prefer configured host for new UI (ignore legacy stored clientUrl)
+    const hostBase = (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const baseUrl = `${hostBase}/tenant/${tenant.slug}`;
 
     let sentCount = 0;
     let failedCount = 0;
@@ -320,7 +321,8 @@ exports.generateClientReferralLink = async (req, res) => {
       { expiresIn: '30d' }
     );
 
-    const baseUrl = tenant.clientUrl || process.env.CLIENT_URL || 'http://localhost:5173/tenant';
+    const hostBase = (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const baseUrl = `${hostBase}/tenant/${tenant.slug}`;
     const referralLink = `${baseUrl.replace(/\/$/, '')}/generate-referral?token=${token}`;
 
     res.json({

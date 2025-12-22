@@ -19,20 +19,9 @@ const defaultFields = [
   { id: 'notes', label: 'Additional Notes', type: 'textarea', required: false }
 ];
 
-const tenantFieldConfig = {
-  // Example per-tenant override; add more as needed
-  default: defaultFields,
-  'pet-hospital-newport-9225': [
-    { id: 'preferredDate', label: 'Preferred Date', type: 'date', required: false },
-    { id: 'pets', label: 'Do you have pets?', type: 'select', options: ['No', 'Dog', 'Cat', 'Other'], required: false },
-    { id: 'notes', label: 'Additional Notes', type: 'textarea', required: false }
-  ]
-  // 'another-tenant-slug': [...fields],
-};
-
 function getFieldsForTenant(slug) {
   if (!slug) return defaultFields;
-  return tenantFieldConfig[slug] || defaultFields;
+  return defaultFields;
 }
 
 module.exports = {

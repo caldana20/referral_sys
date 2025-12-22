@@ -14,7 +14,7 @@ const { v4: uuidv4 } = require('uuid');
 async function ensureDefaultTenant() {
   let tenant = await Tenant.findOne({ where: { slug: 'default' } });
   if (!tenant) {
-    const baseUrl = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || '';
+    const baseUrl = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000/tenant';
     const clientUrl = baseUrl ? `${baseUrl.replace(/\/$/, '')}/default` : `https://example.com/tenant/default`;
     tenant = await Tenant.create({
       name: 'Default Tenant',

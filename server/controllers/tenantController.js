@@ -21,7 +21,7 @@ exports.preview = async (req, res) => {
   if (!trimmedName) return res.status(400).json({ message: 'companyName is required' });
 
   const slug = slugify(trimmedName);
-  const clientUrlBase = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:5173/tenant';
+  const clientUrlBase = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000/tenant';
   const clientUrl = buildClientUrl(clientUrlBase, slug);
 
   res.json({ slug, clientUrl });
@@ -49,7 +49,7 @@ exports.confirm = async (req, res) => {
   }
 
   const slug = tenantSlug || slugify(trimmedName);
-  const clientUrlBase = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:5173/tenant';
+  const clientUrlBase = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000/tenant';
   const clientUrl = buildClientUrl(clientUrlBase, slug);
 
   const tx = await sequelize.transaction();
@@ -169,6 +169,50 @@ exports.updateSettings = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to update settings', error: err.message });
+  }
+};
+
+// Authenticated: get tenant estimate field config
+exports.getFieldConfig = async (req, res) => {
+  try {
+    const tenant = await Tenant.findByPk(req.user.tenantId);
+    if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
+    res.json({
+      fields: tenant.estimateFieldConfig || null
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to load field config', error: err.message });
+  }
+};
+
+// Authenticated: update tenant estimate field config
+exports.updateFieldConfig = async (req, res) => {
+  const { fields } = req.body;
+
+  if (!Array.isArray(fields)) {
+    return res.status(400).json({ message: 'fields must be an array' });
+  }
+
+  for (const field of fields) {
+    if (!field.id || !field.label || !field.type) {
+      return res.status(400).json({ message: 'Each field requires id, label, and type' });
+    }
+    if (field.type === 'select' && (!Array.isArray(field.options) || field.options.length === 0)) {
+      return res.status(400).json({ message: 'Select fields require non-empty options' });
+    }
+  }
+
+  try {
+    const tenant = await Tenant.findByPk(req.user.tenantId);
+    if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
+    tenant.estimateFieldConfig = fields;
+    await tenant.save();
+
+    res.json({ fields: tenant.estimateFieldConfig });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update field config', error: err.message });
   }
 };
 

@@ -36,6 +36,8 @@ router.get('/list-public', tenantController.listPublic);
 // Authenticated admin endpoints
 router.get('/settings', authenticateToken, requireAdmin, tenantController.getSettings);
 router.patch('/settings', authenticateToken, requireAdmin, upload.single('logo'), tenantController.updateSettings);
+router.get('/fields', authenticateToken, requireAdmin, tenantController.getFieldConfig);
+router.patch('/fields', authenticateToken, requireAdmin, tenantController.updateFieldConfig);
 
 module.exports = router;
 

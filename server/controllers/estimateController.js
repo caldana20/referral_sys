@@ -30,7 +30,7 @@ exports.createEstimate = async (req, res) => {
     }
 
     // Validate and sanitize custom fields
-    const fieldDefs = getFieldsForTenant(tenant.slug);
+    const fieldDefs = tenant.estimateFieldConfig || getFieldsForTenant(tenant.slug);
     const sanitizedCustomFields = {};
     const errors = [];
 
