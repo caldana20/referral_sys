@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "sync": "node scripts/syncSchema.js"
+    "sync": "node scripts/syncSchema.js",
+    "seed:hosts": "node scripts/seedTenantHosts.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

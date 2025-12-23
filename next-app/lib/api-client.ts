@@ -1,5 +1,6 @@
 import { API_BASE_URL, isBrowser } from "./config";
 import { clearAuth, getToken } from "./auth-store";
+import { CURRENT_HOST } from "./config";
 
 export type ApiRequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -56,6 +57,11 @@ export async function apiFetch<T = unknown>(path: string, options?: ApiRequestOp
   if (isFormLike && (headers as Record<string, string>)["Content-Type"]) {
     // Let the browser set the multipart boundary
     delete (headers as Record<string, string>)["Content-Type"];
+  }
+
+  // Send current host to backend so tenant can be resolved when API host differs
+  if (isBrowser && CURRENT_HOST) {
+    (headers as Record<string, string>)["X-Tenant-Host"] = CURRENT_HOST;
   }
 
   const res = await fetch(makeUrl(path), {

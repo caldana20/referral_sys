@@ -4,17 +4,15 @@ const { User, Tenant } = require('../models');
 require('dotenv').config();
 
 exports.login = async (req, res) => {
-  const { email, password, tenantSlug } = req.body;
+  const { email, password } = req.body;
 
   try {
-    if (!tenantSlug) {
-      return res.status(400).json({ message: 'tenantSlug is required' });
+    // tenant context derived from host resolver
+    if (!req.tenant || !req.tenant.tenantId) {
+      return res.status(400).json({ message: 'Unable to resolve tenant from host' });
     }
-
-    const tenant = await Tenant.findOne({ where: { slug: tenantSlug } });
-    if (!tenant) {
-      return res.status(401).json({ message: 'Invalid tenant' });
-    }
+    const tenant = await Tenant.findByPk(req.tenant.tenantId);
+    if (!tenant) return res.status(401).json({ message: 'Invalid tenant' });
 
     const normalizedEmail = (email || '').toLowerCase().trim();
     const user = await User.findOne({ where: { email: normalizedEmail, tenantId: tenant.id } });

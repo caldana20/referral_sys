@@ -6,10 +6,12 @@ exports.createEstimate = async (req, res) => {
   const { referralCode, name, email, phone, address, city, description, tenantSlug, customFields = {} } = req.body;
 
   try {
-    if (!tenantSlug) {
-      return res.status(400).json({ message: 'tenantSlug is required' });
+    let tenant = null;
+    if (tenantSlug) {
+      tenant = await require('../models').Tenant.findOne({ where: { slug: tenantSlug } });
+    } else if (req.tenant?.tenantId) {
+      tenant = await require('../models').Tenant.findByPk(req.tenant.tenantId);
     }
-    const tenant = await require('../models').Tenant.findOne({ where: { slug: tenantSlug } });
     if (!tenant) return res.status(404).json({ message: 'Invalid tenant' });
     const companyName = tenant.name || 'Your Company';
     const fromEmail = tenant.sendgridFromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;

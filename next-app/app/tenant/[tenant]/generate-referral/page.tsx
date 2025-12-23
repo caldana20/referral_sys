@@ -37,11 +37,10 @@ export default function GenerateReferralPage() {
   useEffect(() => {
     const loadRewards = async () => {
       try {
-        if (!tenantSlug) {
-          setError("Missing tenant. Please use a valid referral link.");
-          return;
-        }
-        const res = await apiFetch<Reward[]>(`/api/rewards/active?tenantSlug=${encodeURIComponent(tenantSlug)}`);
+        const url = tenantSlug
+          ? `/api/rewards/active?tenantSlug=${encodeURIComponent(tenantSlug)}`
+          : "/api/rewards/active";
+        const res = await apiFetch<Reward[]>(url);
         const rewardsData = Array.isArray(res) ? res : [];
         setRewards(rewardsData);
         if (rewardsData.length > 0) {
@@ -92,10 +91,6 @@ export default function GenerateReferralPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!tenantSlug) {
-      setError("Missing tenant. Please use a valid referral link.");
-      return;
-    }
     setLoading(true);
     try {
       const payload = {
@@ -108,7 +103,9 @@ export default function GenerateReferralPage() {
         body: payload,
       });
       const { code } = res;
-      const link = `${window.location.origin}/tenant/${tenantSlug}/referral/${code}`;
+      const link = tenantSlug
+        ? `${window.location.origin}/tenant/${tenantSlug}/referral/${code}`
+        : `${window.location.origin}/referral/${code}`;
       setGeneratedLink(link);
       setStep(2);
     } catch (err: unknown) {
