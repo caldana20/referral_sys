@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,17 +11,14 @@ import { toast } from "sonner";
 
 function AdminLoginContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const defaultTenant = searchParams.get("tenant") || "";
   const { login, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tenantSlug, setTenantSlug] = useState(defaultTenant);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login({ email, password, tenantSlug });
+      await login({ email, password, tenantSlug: "" });
       toast.success("Logged in");
       router.push("/admin");
     } catch (err: unknown) {
@@ -35,21 +32,10 @@ function AdminLoginContent() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Admin Login</CardTitle>
-          <CardDescription>Enter tenant slug, admin email, and password.</CardDescription>
+          <CardDescription>Enter admin email and password. Tenant is resolved by host.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="tenant">Tenant Slug</Label>
-              <Input
-                id="tenant"
-                name="tenant"
-                value={tenantSlug}
-                onChange={(e) => setTenantSlug(e.target.value)}
-                required
-                placeholder="acme"
-              />
-            </div>
             <div className="space-y-1">
               <Label htmlFor="email">Admin Email</Label>
               <Input

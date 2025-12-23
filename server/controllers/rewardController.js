@@ -11,12 +11,21 @@ exports.getRewards = async (req, res) => {
 
 exports.getActiveRewards = async (req, res) => {
   try {
+    let tenantId = req.user?.tenantId;
     const { tenantSlug } = req.query;
-    if (!tenantSlug) return res.status(400).json({ message: 'tenantSlug is required' });
-    const tenant = await Tenant.findOne({ where: { slug: tenantSlug } });
-    if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
 
-    const rewards = await RewardSetting.findAll({ where: { active: true, tenantId: tenant.id } });
+    if (!tenantId && tenantSlug) {
+      const tenant = await Tenant.findOne({ where: { slug: tenantSlug } });
+      tenantId = tenant?.id;
+    }
+
+    if (!tenantId && req.tenant?.tenantId) {
+      tenantId = req.tenant.tenantId;
+    }
+
+    if (!tenantId) return res.status(400).json({ message: 'Tenant context is required' });
+
+    const rewards = await RewardSetting.findAll({ where: { active: true, tenantId } });
     res.json(rewards);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

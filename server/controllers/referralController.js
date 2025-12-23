@@ -1,7 +1,31 @@
-const { Referral, User, Estimate, Tenant } = require('../models');
+const { Referral, User, Estimate, Tenant, TenantHost } = require('../models');
 const crypto = require('crypto');
 const { sendEmail } = require('../utils/emailService');
 const { getFieldsForTenant } = require('../config/tenantFields');
+
+async function getPrimaryHost(tenantId) {
+  const host = await TenantHost.findOne({
+    where: { tenantId },
+    order: [['isPrimary', 'DESC']]
+  });
+  return host ? host.host : null;
+}
+
+async function buildTenantBaseUrl(tenantId) {
+  const host =
+    (await getPrimaryHost(tenantId)) ||
+    (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000');
+
+  const protocol = process.env.CLIENT_PROTOCOL || (host.startsWith('http') ? '' : 'http');
+  let cleanHost = host.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+  const hasPort = cleanHost.includes(':');
+  if (cleanHost.includes('localhost') && !hasPort) {
+    cleanHost = `${cleanHost}:${process.env.CLIENT_PORT || '3000'}`;
+  }
+
+  return `${protocol ? `${protocol}://` : ''}${cleanHost}`;
+}
 
 exports.createReferral = async (req, res) => {
   // Client identifies themselves
@@ -9,10 +33,12 @@ exports.createReferral = async (req, res) => {
   console.log('Creating referral request:', req.body);
 
   try {
-    if (!tenantSlug) {
-      return res.status(400).json({ message: 'tenantSlug is required' });
-    }
-    const tenant = await Tenant.findOne({ where: { slug: tenantSlug } });
+    const resolvedSlug = tenantSlug || req.tenant?.tenantSlug;
+    const tenant = resolvedSlug
+      ? await Tenant.findOne({ where: { slug: resolvedSlug } })
+      : req.tenant?.tenantId
+        ? await Tenant.findByPk(req.tenant.tenantId)
+        : null;
     if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
 
     const companyName = tenant.name || 'Your Company';
@@ -58,10 +84,9 @@ exports.createReferral = async (req, res) => {
     console.log('Referral created:', referral.id);
 
     // Send confirmation email to the client
-    // Always prefer the configured host for new UI (ignore stored legacy URLs)
-    const hostBase = (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
-    const clientBase = `${hostBase}/tenant/${tenant.slug}`;
-    const referralLink = `${clientBase.replace(/\/$/, '')}/referral/${code}`;
+    // Prefer primary host mapping, fall back to configured URLs
+    const baseUrl = await buildTenantBaseUrl(tenant.id);
+    const referralLink = `${baseUrl}/referral/${code}`;
     
     // --- Send Email to Client ---
     const clientEmailSubject = `Your ${companyName} Referral Link is Ready! ✨`;
@@ -264,12 +289,14 @@ exports.updateReferralStatus = async (req, res) => {
 exports.getReferralByCode = async (req, res) => {
   const { code } = req.params;
   try {
+    let tenant = null;
     const { tenantSlug } = req.query;
-    if (!tenantSlug) {
-      return res.status(400).json({ message: 'tenantSlug is required' });
+    if (tenantSlug) {
+      tenant = await Tenant.findOne({ where: { slug: tenantSlug } });
+    } else if (req.tenant?.tenantId) {
+      tenant = await Tenant.findByPk(req.tenant.tenantId);
     }
 
-    const tenant = await Tenant.findOne({ where: { slug: tenantSlug } });
     if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
 
     const referral = await Referral.findOne({ 

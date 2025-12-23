@@ -1,4 +1,4 @@
-const { User, Tenant } = require('../models');
+const { User, Tenant, TenantHost } = require('../models');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const csv = require('csv-parser');
@@ -190,9 +190,9 @@ exports.sendInvitations = async (req, res) => {
 
     const companyName = tenant.name || 'Your Company';
     const fromEmail = tenant.sendgridFromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
-    // Always prefer configured host for new UI (ignore legacy stored clientUrl)
-    const hostBase = (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
-    const baseUrl = `${hostBase}/tenant/${tenant.slug}`;
+    const host = (await getPrimaryHost(tenant.id)) || (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000');
+    const protocol = process.env.CLIENT_PROTOCOL || (host.startsWith('http') ? '' : 'http');
+    const cleanHost = host.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
     let sentCount = 0;
     let failedCount = 0;
@@ -215,7 +215,7 @@ exports.sendInvitations = async (req, res) => {
         );
 
         // Create personalized link that will pre-fill their information
-        const personalizedLink = `${baseUrl.replace(/\/$/, '')}/generate-referral?token=${token}`;
+        const personalizedLink = `${await buildTenantBaseUrl(tenant.id)}/generate-referral?token=${token}`;
 
         const emailHtml = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
@@ -289,6 +289,30 @@ exports.sendInvitations = async (req, res) => {
 };
 
 // Generate a client-specific referral link token
+async function getPrimaryHost(tenantId) {
+  const host = await TenantHost.findOne({
+    where: { tenantId },
+    order: [['isPrimary', 'DESC']]
+  });
+  return host ? host.host : null;
+}
+
+async function buildTenantBaseUrl(tenantId) {
+  const host =
+    (await getPrimaryHost(tenantId)) ||
+    (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000');
+
+  const protocol = process.env.CLIENT_PROTOCOL || (host.startsWith('http') ? '' : 'http');
+  let cleanHost = host.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+  const hasPort = cleanHost.includes(':');
+  if (cleanHost.includes('localhost') && !hasPort) {
+    cleanHost = `${cleanHost}:${process.env.CLIENT_PORT || '3000'}`;
+  }
+
+  return `${protocol ? `${protocol}://` : ''}${cleanHost}`;
+}
+
 exports.generateClientReferralLink = async (req, res) => {
   const { clientId } = req.params;
 
@@ -321,9 +345,8 @@ exports.generateClientReferralLink = async (req, res) => {
       { expiresIn: '30d' }
     );
 
-    const hostBase = (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
-    const baseUrl = `${hostBase}/tenant/${tenant.slug}`;
-    const referralLink = `${baseUrl.replace(/\/$/, '')}/generate-referral?token=${token}`;
+    const baseUrl = await buildTenantBaseUrl(tenant.id);
+    const referralLink = `${baseUrl}/generate-referral?token=${token}`;
 
     res.json({
       link: referralLink,

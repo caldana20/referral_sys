@@ -4,6 +4,7 @@ const User = require('./User');
 const Referral = require('./Referral');
 const Estimate = require('./Estimate');
 const RewardSetting = require('./RewardSetting');
+const TenantHost = require('./TenantHost');
 
 // Tenant relationships
 Tenant.hasMany(User, { foreignKey: 'tenantId' });
@@ -18,6 +19,9 @@ Estimate.belongsTo(Tenant, { foreignKey: 'tenantId' });
 Tenant.hasMany(RewardSetting, { foreignKey: 'tenantId' });
 RewardSetting.belongsTo(Tenant, { foreignKey: 'tenantId' });
 
+Tenant.hasMany(TenantHost, { foreignKey: 'tenantId' });
+TenantHost.belongsTo(Tenant, { foreignKey: 'tenantId' });
+
 // Existing relationships
 User.hasMany(Referral, { foreignKey: 'userId' });
 Referral.belongsTo(User, { foreignKey: 'userId' });
@@ -31,7 +35,8 @@ const db = {
   User,
   Referral,
   Estimate,
-  RewardSetting
+  RewardSetting,
+  TenantHost
 };
 
 module.exports = db;

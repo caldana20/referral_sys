@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
 import { toast } from "sonner";
+import Link from "next/link";
 
 type Client = {
   id: number;
@@ -122,6 +123,12 @@ export default function AdminClientsPage() {
           <CardDescription>Invite clients, generate referral links, and bulk import.</CardDescription>
         </div>
         <div className="flex gap-2">
+          <Button asChild size="sm">
+            <Link href="/admin/clients/new">Add Client</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/clients/bulk-upload">Bulk Upload (.csv)</Link>
+          </Button>
           <Button variant="outline" size="sm" onClick={handleSendInvitations} disabled={inviting || loading}>
             {inviting ? "Sending..." : "Send Invitations"}
           </Button>

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const db = require('./models');
+const tenantHostResolver = require('./middleware/tenantHostResolver');
 const authRoutes = require('./routes/authRoutes');
 const referralRoutes = require('./routes/referralRoutes');
 const estimateRoutes = require('./routes/estimateRoutes');
@@ -24,23 +25,34 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // CORS: allow explicit origins and credentials (no wildcard when using credentials)
-const allowedOrigins = [
+const allowList = [
   process.env.CLIENT_URL,
   "http://localhost:5173",
-  "http://localhost:3000"
+  "http://localhost:3000",
+  "http://default.localhost:3000"
 ].filter(Boolean);
 
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const normalized = origin.toLowerCase();
+    if (allowList.includes(normalized) || normalized.endsWith(".localhost:3000")) {
+      return callback(null, true);
+    }
+    return callback(new Error("Not allowed by CORS"), false);
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-Tenant-Host"]
 };
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
+
+// Resolve tenant from host for all API routes (after static)
+app.use(tenantHostResolver());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/referrals', referralRoutes);
