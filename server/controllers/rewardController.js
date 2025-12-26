@@ -37,9 +37,13 @@ exports.createReward = async (req, res) => {
   if (!name) return res.status(400).json({ message: 'Reward name is required' });
 
   try {
-    const reward = await RewardSetting.create({ name, tenantId: req.user.tenantId });
+    const tenantId = req.user?.tenantId || req.tenant?.tenantId;
+    if (!tenantId) return res.status(400).json({ message: 'Tenant context is required' });
+
+    const reward = await RewardSetting.create({ name, tenantId });
     res.status(201).json(reward);
   } catch (error) {
+    console.error('Error creating reward:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

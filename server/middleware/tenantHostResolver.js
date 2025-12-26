@@ -47,11 +47,24 @@ function tenantHostResolver() {
 
     try {
       const context = await resolveHost(host);
-      if (!context) {
-        return res.status(404).json({ message: 'Unknown tenant host' });
+      if (context) {
+        req.tenant = context;
+        return next();
       }
-      req.tenant = context;
-      next();
+
+      // Dev-friendly fallback: localhost or unknown host -> try default or first tenant
+      const fallbackSlug = process.env.DEFAULT_TENANT_SLUG || 'default';
+      let fallback = await Tenant.findOne({ where: { slug: fallbackSlug } });
+      if (!fallback) {
+        fallback = await Tenant.findOne({ order: [['id', 'ASC']] });
+      }
+
+      if (fallback) {
+        req.tenant = { tenantId: fallback.id, tenantSlug: fallback.slug, tenantName: fallback.name };
+        return next();
+      }
+
+      return res.status(404).json({ message: 'Unknown tenant host' });
     } catch (err) {
       console.error('Tenant host resolution failed', err);
       res.status(500).json({ message: 'Failed to resolve tenant host' });

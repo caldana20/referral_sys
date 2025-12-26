@@ -12,13 +12,19 @@ exports.listStates = (req, res) => {
   res.json(states);
 };
 
-// Resolve tenant from host resolver middleware
+// Resolve tenant from host resolver middleware, with optional tenantSlug override
 exports.getTenantFromHost = async (req, res) => {
   try {
-    if (!req.tenant || !req.tenant.tenantId) {
+    let tenantId = req.tenant?.tenantId;
+    const { tenantSlug } = req.query;
+    if (tenantSlug) {
+      const t = await Tenant.findOne({ where: { slug: tenantSlug } });
+      tenantId = t?.id || tenantId;
+    }
+    if (!tenantId) {
       return res.status(404).json({ message: 'Tenant not resolved' });
     }
-    const tenant = await Tenant.findByPk(req.tenant.tenantId, {
+    const tenant = await Tenant.findByPk(tenantId, {
       attributes: ['id', 'slug', 'name', 'clientUrl', 'logoUrl', 'sendgridFromEmail']
     });
     if (!tenant) return res.status(404).json({ message: 'Tenant not found' });

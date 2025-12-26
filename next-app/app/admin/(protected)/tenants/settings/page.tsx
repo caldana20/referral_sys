@@ -15,7 +15,6 @@ type TenantSettings = {
   name: string;
   slug: string;
   logoUrl?: string | null;
-  sendgridFromEmail?: string | null;
 };
 
 export default function TenantSettingsPage() {
@@ -48,10 +47,6 @@ export default function TenantSettingsPage() {
 
   const handleSave = async () => {
     if (!settings) return;
-    if (!name.trim() && !logoFile) {
-      toast.message("Nothing to update");
-      return;
-    }
 
     const formData = new FormData();
     if (name.trim()) formData.append("name", name.trim());
@@ -72,7 +67,13 @@ export default function TenantSettingsPage() {
       setLogoFile(null);
       toast.success("Settings updated");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to save settings";
+      const status = (err as { status?: number }).status;
+      const message =
+        status === 413
+          ? "Upload too large. Please use an image under 10 MB."
+          : err instanceof Error
+          ? err.message
+          : "Failed to save settings";
       toast.error(message);
     } finally {
       setSaving(false);
@@ -115,10 +116,6 @@ export default function TenantSettingsPage() {
               setLogoPreview(file ? URL.createObjectURL(file) : null);
             }}
           />
-        </div>
-        <div className="space-y-1">
-          <Label>SendGrid From Email</Label>
-          <Input value={settings?.sendgridFromEmail || ""} disabled />
         </div>
         <Button onClick={handleSave} disabled={saving || !name.trim()}>
           {saving ? "Saving..." : "Save"}

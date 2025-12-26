@@ -17,6 +17,10 @@ type FieldConfig = {
   type: "text" | "textarea" | "email" | "number" | "select" | "date" | "checkbox";
   required?: boolean;
   options?: string[];
+  span?: 1 | 2;
+  placeholder?: string;
+  rows?: number;
+  helpText?: string;
 };
 
 type ReferralResponse = {
@@ -41,6 +45,7 @@ export default function ReferralLandingHostPage() {
     address: "",
     city: "",
     description: "",
+    notes: "",
   });
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -113,10 +118,11 @@ export default function ReferralLandingHostPage() {
       value,
       onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setCustomFields({ ...customFields, [field.id]: e.target.value }),
+      placeholder: field.placeholder,
     };
     switch (field.type) {
       case "textarea":
-        return <Textarea {...commonProps} />;
+        return <Textarea {...commonProps} rows={field.rows ?? 3} />;
       case "select":
         return (
           <Select value={value} onValueChange={(val) => setCustomFields({ ...customFields, [field.id]: val })}>
@@ -133,7 +139,7 @@ export default function ReferralLandingHostPage() {
           </Select>
         );
       case "date":
-        return <Input type="date" {...commonProps} />;
+        return <Input type="date" {...commonProps} className="max-w-xs" />;
       case "checkbox":
         return (
           <div className="flex items-center gap-2">
@@ -156,6 +162,14 @@ export default function ReferralLandingHostPage() {
       default:
         return <Input type="text" {...commonProps} />;
     }
+  };
+
+  const fieldSpanClass = (field: FieldConfig) => {
+    // Make textareas and long inputs span full width on desktop
+    if (field.span === 2) return "md:col-span-2";
+    if (field.type === "textarea") return "md:col-span-2";
+    if (field.type === "checkbox") return "md:col-span-2";
+    return "md:col-span-1";
   };
 
   return (
@@ -188,76 +202,97 @@ export default function ReferralLandingHostPage() {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label className="mb-1 block">Full Name</Label>
-                <Input
-                  required
-                  name="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label className="mb-1 block">Email</Label>
-                <Input
-                  required
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <Label className="mb-1 block">Phone</Label>
-                  <Input
-                    name="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <section className="space-y-3">
+                <h2 className="text-lg font-semibold text-slate-900">Contact</h2>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1 md:col-span-2">
+                    <Label className="mb-1 block">Full Name</Label>
+                    <Input
+                      required
+                      name="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="mb-1 block">Email</Label>
+                    <Input
+                      required
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="mb-1 block">Phone</Label>
+                    <Input
+                      name="phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="mb-1 block">Address</Label>
+                    <Input
+                      name="address"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="mb-1 block">City</Label>
+                    <Input
+                      name="city"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h2 className="text-lg font-semibold text-slate-900">Project</h2>
+                <div className="space-y-1">
+                  <Label className="mb-1 block">Project Description</Label>
+                  <Textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={4}
+                    placeholder="Describe your project requirements..."
+                    required
                   />
                 </div>
-                <div>
-                  <Label className="mb-1 block">City</Label>
-                  <Input
-                    name="city"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label className="mb-1 block">Address</Label>
-                <Input
-                  name="address"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <Label className="mb-1 block">Project Description</Label>
-                <Textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={4}
-                  placeholder="Describe your project requirements..."
-                  required
-                />
-              </div>
+              </section>
 
               {referralData?.fieldConfig?.length ? (
-                <div className="space-y-3">
-                  {referralData.fieldConfig.map((field) => (
-                    <div key={field.id} className="space-y-1">
-                      <Label htmlFor={field.id}>{field.label}</Label>
-                      {renderField(field)}
-                    </div>
-                  ))}
-                </div>
+                <section className="space-y-3">
+                  <h2 className="text-lg font-semibold text-slate-900">Additional Details</h2>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {referralData.fieldConfig.map((field) => (
+                      <div key={field.id} className={`space-y-1 ${fieldSpanClass(field)}`}>
+                        <Label htmlFor={field.id}>
+                          {field.label} {field.required ? "*" : ""}
+                        </Label>
+                        {renderField(field)}
+                      </div>
+                    ))}
+                  </div>
+                </section>
               ) : null}
+
+              <section className="space-y-3">
+                <h2 className="text-lg font-semibold text-slate-900">Notes</h2>
+                <Textarea
+                  name="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Additional notes"
+                  rows={3}
+                />
+              </section>
 
               <Button type="submit" className="w-full">
                 Submit Request

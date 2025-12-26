@@ -14,10 +14,14 @@ exports.sendEmail = async ({ to, subject, html, fromEmail, fromName }) => {
     return null;
   }
 
-  // Validate sender email
-  const resolvedFromEmail = fromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+  // Require explicit sender; no fallbacks. Validate format.
+  const resolvedFromEmail = fromEmail;
   if (!resolvedFromEmail) {
-    console.error('Error: SENDGRID_FROM_EMAIL or EMAIL_USER environment variable is not set');
+    console.error('Error: fromEmail is required and no fallback is allowed');
+    return null;
+  }
+  if (!/^[^@]+@[^@]+\.[^@]+$/.test(resolvedFromEmail)) {
+    console.error('Error: fromEmail is invalid');
     return null;
   }
   const resolvedFromName = fromName || process.env.COMPANY_NAME || 'Your Company';
@@ -53,7 +57,6 @@ exports.sendEmail = async ({ to, subject, html, fromEmail, fromName }) => {
     };
   } catch (error) {
     console.error('Error sending email via SendGrid:', error);
-    
     // Log detailed error information
     if (error.response) {
       console.error('SendGrid API Error:', {
@@ -61,6 +64,11 @@ exports.sendEmail = async ({ to, subject, html, fromEmail, fromName }) => {
         body: error.response.body,
         headers: error.response.headers
       });
+      try {
+        console.error('SendGrid error body (stringified):', JSON.stringify(error.response.body));
+      } catch (_) {
+        // ignore stringify failures
+      }
     }
     
     // Return null so we don't crash the request flow

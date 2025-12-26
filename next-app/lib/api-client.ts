@@ -28,10 +28,19 @@ async function buildHeaders(options?: ApiRequestOptions): Promise<HeadersInit> {
   return base;
 }
 
+function resolveBase() {
+  // If a wildcard is used, prefer the current origin directly to avoid duplicate suffixes
+  if (isBrowser && API_BASE_URL.includes("*")) {
+    return window.location.origin;
+  }
+  return API_BASE_URL;
+}
+
 function makeUrl(path: string) {
   if (path.startsWith("http")) return path;
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE_URL}${normalized}`;
+  const base = resolveBase();
+  return `${base}${normalized}`;
 }
 
 export async function apiFetch<T = unknown>(path: string, options?: ApiRequestOptions): Promise<T> {
