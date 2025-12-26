@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import { useTenant } from "@/components/providers/tenant-provider";
 
 type Reward = { id: number; name: string; active?: boolean };
 
-export default function GenerateReferralHostPage() {
+function GenerateReferralHostContent() {
   const searchParams = useSearchParams();
   const { tenantSlug: ctxTenant } = useTenant();
 
@@ -212,6 +212,14 @@ export default function GenerateReferralHostPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function GenerateReferralHostPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-slate-600">Loading…</div>}>
+      <GenerateReferralHostContent />
+    </Suspense>
   );
 }
 

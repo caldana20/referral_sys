@@ -9,6 +9,7 @@ const userRoutes = require('./routes/userRoutes');
 const rewardRoutes = require('./routes/rewardRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
 const metaRoutes = require('./routes/metaRoutes');
+const metricsRoutes = require('./routes/metricsRoutes');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 require('dotenv').config();
@@ -32,14 +33,30 @@ const allowList = [
   "http://default.localhost:3000"
 ].filter(Boolean);
 
+const suffixes = [
+  process.env.CORS_DOMAIN_SUFFIX, // e.g. .tenant.refoza.com
+  process.env.HOST_BASE // e.g. localhost or tenant.refoza.com
+].filter(Boolean);
+
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    const normalized = origin.toLowerCase();
-    if (allowList.includes(normalized) || normalized.endsWith(".localhost:3000")) {
-      return callback(null, true);
+    try {
+      const normalized = origin.toLowerCase();
+      if (allowList.includes(normalized) || normalized.endsWith(".localhost:3000")) {
+        return callback(null, true);
+      }
+      const url = new URL(origin);
+      const host = url.hostname.toLowerCase();
+      const allowedBySuffix = suffixes.some((s) => {
+        const clean = s.replace(/^\.+/, "").toLowerCase();
+        return host === clean || host.endsWith(`.${clean}`);
+      });
+      if (allowedBySuffix) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"), false);
+    } catch (err) {
+      return callback(new Error("Not allowed by CORS"), false);
     }
-    return callback(new Error("Not allowed by CORS"), false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -48,7 +65,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static('uploads'));
 
 // Resolve tenant from host for all API routes (after static)
@@ -61,6 +79,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/rewards', rewardRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/meta', metaRoutes);
+app.use('/api/metrics', metricsRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

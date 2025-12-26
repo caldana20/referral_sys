@@ -42,7 +42,10 @@ exports.createReferral = async (req, res) => {
     if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
 
     const companyName = tenant.name || 'Your Company';
-    const fromEmail = tenant.sendgridFromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    if (!fromEmail) {
+      return res.status(500).json({ message: 'Server email sender not configured' });
+    }
 
     // Check if client exists in this tenant
     const normalizedEmail = email ? email.toLowerCase() : '';
@@ -124,6 +127,7 @@ exports.createReferral = async (req, res) => {
     `;
 
     // Send to Client
+    console.log('Email send (referral->client)', { tenant: tenant.slug, fromEmail, to: user.email });
     sendEmail({
       to: user.email,
       subject: clientEmailSubject,
@@ -159,6 +163,7 @@ exports.createReferral = async (req, res) => {
               </div>
             `;
 
+            console.log('Email send (referral->admins)', { tenant: tenant.slug, fromEmail, to: adminEmails });
             sendEmail({
                 to: adminEmails,
                 subject: `New ${companyName} Referral Link Generated`,
@@ -215,7 +220,8 @@ exports.updateReferralStatus = async (req, res) => {
 
     const tenant = await Tenant.findByPk(req.user.tenantId);
     const companyName = tenant?.name || 'Your Company';
-    const fromEmail = tenant?.sendgridFromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    if (!fromEmail) return res.status(500).json({ message: 'Server email sender not configured' });
 
     const previousStatus = referral.status;
     referral.status = status;

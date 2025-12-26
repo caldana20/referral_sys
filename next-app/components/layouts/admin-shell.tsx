@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { useTenant } from "@/components/providers/tenant-provider";
 
 type AdminShellProps = {
   children: ReactNode;
@@ -26,6 +29,9 @@ export function AdminShell({
   description,
   activePath = "",
 }: AdminShellProps) {
+  const { tenantName, tenantSlug } = useTenant();
+  const displayTenant = tenantName || tenantSlug || "Tenant";
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b bg-white">
@@ -37,7 +43,9 @@ export function AdminShell({
             ) : null}
           </div>
           <div className="flex items-center gap-4 text-sm text-slate-700">
-            <span className="hidden sm:inline">Multi-tenant</span>
+            <span className="hidden sm:inline rounded-full bg-slate-900 px-3 py-1 text-white">
+              {displayTenant}
+            </span>
             <Separator orientation="vertical" className="h-6" />
             <Link href="/admin/logout" className="hover:text-slate-900">
               Logout

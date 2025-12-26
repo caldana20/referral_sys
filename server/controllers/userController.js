@@ -83,6 +83,32 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
+// Update a user (admin only, same tenant)
+exports.updateUser = async (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone } = req.body;
+
+  try {
+    const user = await User.findOne({ where: { id, tenantId: req.user.tenantId } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (email && email.trim() === '') return res.status(400).json({ message: 'Email cannot be empty' });
+    if (name && name.trim() === '') return res.status(400).json({ message: 'Name cannot be empty' });
+
+    if (name) user.name = name.trim();
+    if (email) user.email = email.toLowerCase().trim();
+    if (phone !== undefined) user.phone = phone;
+
+    await user.save();
+    const resp = user.toJSON();
+    delete resp.password_hash;
+    res.json(resp);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Server error updating user', error: error.message });
+  }
+};
+
 exports.importClients = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded' });
@@ -189,7 +215,8 @@ exports.sendInvitations = async (req, res) => {
     }
 
     const companyName = tenant.name || 'Your Company';
-    const fromEmail = tenant.sendgridFromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    if (!fromEmail) return res.status(500).json({ message: 'Server email sender not configured' });
     const host = (await getPrimaryHost(tenant.id)) || (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000');
     const protocol = process.env.CLIENT_PROTOCOL || (host.startsWith('http') ? '' : 'http');
     const cleanHost = host.replace(/^https?:\/\//, '').replace(/\/$/, '');

@@ -1,4 +1,4 @@
-const { Tenant, User, RewardSetting, sequelize } = require('../models');
+const { Tenant, User, RewardSetting, TenantHost, sequelize } = require('../models');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
@@ -14,6 +14,26 @@ function buildClientUrl(base, slug) {
   return `${clean}/${slug}`;
 }
 
+function buildHostClientUrl(slug) {
+  // Prefer HOST_BASE (e.g., *.tenant.refoza.com) and fall back to CLIENT_URL_BASE/CLIENT_URL
+  const raw = process.env.HOST_BASE || process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000';
+  const withProtocol = raw.startsWith('http') ? raw : `http://${raw}`;
+  try {
+    const u = new URL(withProtocol);
+    const cleanHost = u.hostname.replace(/^\*\./, '').replace(/^\*/, '');
+    // If hostname already contains the slug, return as-is
+    if (cleanHost.startsWith(`${slug}.`)) {
+      u.hostname = cleanHost;
+      return u.origin;
+    }
+    u.hostname = `${slug}.${cleanHost}`;
+    return u.origin;
+  } catch {
+    // Fallback to path-based
+    return buildClientUrl(withProtocol, slug);
+  }
+}
+
 // Preview derived values
 exports.preview = async (req, res) => {
   const { companyName } = req.body;
@@ -21,8 +41,7 @@ exports.preview = async (req, res) => {
   if (!trimmedName) return res.status(400).json({ message: 'companyName is required' });
 
   const slug = slugify(trimmedName);
-  const clientUrlBase = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000/tenant';
-  const clientUrl = buildClientUrl(clientUrlBase, slug);
+  const clientUrl = buildHostClientUrl(slug);
 
   res.json({ slug, clientUrl });
 };
@@ -49,8 +68,7 @@ exports.confirm = async (req, res) => {
   }
 
   const slug = tenantSlug || slugify(trimmedName);
-  const clientUrlBase = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000/tenant';
-  const clientUrl = buildClientUrl(clientUrlBase, slug);
+  const clientUrl = buildHostClientUrl(slug);
 
   const tx = await sequelize.transaction();
   try {
@@ -74,6 +92,12 @@ exports.confirm = async (req, res) => {
       clientUrl,
       sendgridFromEmail
     }, { transaction: tx });
+
+    // Create host mapping for this tenant (normalize HOST_BASE, strip wildcard prefixes)
+    const rawHostBase = process.env.HOST_BASE || 'localhost';
+    const cleanBase = rawHostBase.replace(/^\*\./, '').replace(/^\*/, '').replace(/^\.+/, '');
+    const host = `${slug}.${cleanBase}`.toLowerCase();
+    await TenantHost.create({ host, tenantId: tenant.id, isPrimary: true, verified: true }, { transaction: tx });
 
     const passwordHash = await bcrypt.hash(adminPassword, 10);
     const adminUser = await User.create({

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { setToken, setUser, type AuthUser } from "@/lib/auth-store";
 
 type Country = { code: string; name: string };
 type StateType = { code: string; name: string };
@@ -20,7 +22,6 @@ type ConfirmResponse = {
   tenant?: { slug?: string; clientUrl?: string };
   admin?: { email?: string };
 };
-
 const steps = [
   { id: 1, title: "Company Info" },
   { id: 2, title: "Admin Account" },
@@ -29,6 +30,7 @@ const steps = [
 ];
 
 export default function TenantOnboardingPage() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [geoLoading, setGeoLoading] = useState(false);
@@ -50,10 +52,9 @@ export default function TenantOnboardingPage() {
   const [admin, setAdmin] = useState({
     email: "",
     password: "",
+    confirmPassword: "",
   });
-  const [settings, setSettings] = useState({
-    sendgridFromEmail: "",
-  });
+  // Deprecated: tenant-specific sendgrid settings removed
 
   const missingRequired = useMemo(() => {
     const missing: string[] = [];
@@ -61,8 +62,9 @@ export default function TenantOnboardingPage() {
     if (!company.email.trim()) missing.push("companyEmail");
     if (!admin.email.trim()) missing.push("adminEmail");
     if (!admin.password.trim()) missing.push("adminPassword");
+    if (!admin.confirmPassword.trim()) missing.push("adminPasswordConfirm");
     return missing;
-  }, [company.name, company.email, admin.email, admin.password]);
+  }, [company.name, company.email, admin.email, admin.password, admin.confirmPassword]);
 
   const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
 
@@ -102,6 +104,14 @@ export default function TenantOnboardingPage() {
       setError("adminPassword must be at least 6 characters");
       return false;
     }
+    if (!admin.confirmPassword.trim()) {
+      setError("adminPasswordConfirm is required");
+      return false;
+    }
+    if (admin.password !== admin.confirmPassword) {
+      setError("adminPassword and confirmation must match");
+      return false;
+    }
     return true;
   };
 
@@ -112,6 +122,22 @@ export default function TenantOnboardingPage() {
     }
     return true;
   };
+
+  const loginAsNewAdmin = async () => {
+    try {
+      const res = await apiFetch<{ token: string; user: AuthUser }>("/api/auth/login", {
+        method: "POST",
+        body: { email: admin.email, password: admin.password },
+      });
+      if (res?.token && res?.user) {
+        setToken(res.token);
+        setUser(res.user);
+      }
+    } catch (err) {
+      console.error("Auto-login after onboarding failed", err);
+    }
+  };
+
 
   const handlePreview = async () => {
     if (!validateStep1()) return;
@@ -155,12 +181,19 @@ export default function TenantOnboardingPage() {
           country: company.country,
           adminEmail: admin.email,
           adminPassword: admin.password,
-          sendgridFromEmail: settings.sendgridFromEmail,
+          sendgridFromEmail: undefined,
           tenantSlug: preview?.slug,
         },
       });
       setResult(res);
-      nextStep();
+      await loginAsNewAdmin();
+      if (res?.tenant?.slug) {
+        const slug = res.tenant.slug;
+        // Redirect to host-based admin login
+        router.push(`https://${slug}.tenant.refoza.com/admin/login`);
+      } else {
+        nextStep();
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create tenant";
       setError(message);
@@ -206,6 +239,8 @@ export default function TenantOnboardingPage() {
     };
     loadStates();
   }, [company.country]);
+
+  // Removed post-confirm steps; no-op
 
   const StepIndicator = () => (
     <div className="flex flex-wrap items-center gap-2">
@@ -387,6 +422,18 @@ export default function TenantOnboardingPage() {
                 required
               />
             </div>
+            <div className="space-y-1">
+              <Label>Confirm Password</Label>
+              <Input
+                type="password"
+                value={admin.confirmPassword}
+                onChange={(e) => {
+                  setError("");
+                  setAdmin({ ...admin, confirmPassword: e.target.value });
+                }}
+                required
+              />
+            </div>
             <div className="flex justify-between">
               <Button variant="outline" onClick={prevStep}>
                 Back
@@ -411,11 +458,9 @@ export default function TenantOnboardingPage() {
               <Label>SendGrid From Email</Label>
               <Input
                 type="email"
-                value={settings.sendgridFromEmail}
-                onChange={(e) => {
-                  setError("");
-                  setSettings({ ...settings, sendgridFromEmail: e.target.value });
-                }}
+                value=""
+                disabled
+                placeholder="Configured by system"
               />
             </div>
             {preview && (
@@ -472,7 +517,7 @@ export default function TenantOnboardingPage() {
                 </div>
                 <div>
                   <span className="font-medium">SendGrid From: </span>
-                  {settings.sendgridFromEmail || "(not set)"}
+                  {"(not set)"}
                 </div>
                 {preview && (
                   <>

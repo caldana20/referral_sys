@@ -11,6 +11,7 @@ router.get('/validate-client-token', userController.validateClientToken); // Mus
 router.get('/', authenticateToken, requireAdmin, userController.getUsers);
 router.post('/', authenticateToken, requireAdmin, userController.createUser);
 router.get('/:clientId/generate-referral-link', authenticateToken, requireAdmin, userController.generateClientReferralLink);
+router.patch('/:id', authenticateToken, requireAdmin, userController.updateUser);
 router.delete('/:id', authenticateToken, requireAdmin, userController.deleteUser);
 
 module.exports = router;
