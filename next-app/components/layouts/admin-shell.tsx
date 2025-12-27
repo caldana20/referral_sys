@@ -18,6 +18,7 @@ const navItems = [
   { href: "/admin/clients", label: "Clients" },
   { href: "/admin/referrals", label: "Referrals" },
   { href: "/admin/rewards", label: "Rewards" },
+  { href: "/admin/billing", label: "Billing" },
   { href: "/admin/tenants/settings", label: "Tenant Settings" },
   { href: "/admin/estimate-fields", label: "Estimate Fields" },
   { href: "/admin/admins", label: "Admins" },

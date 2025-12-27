@@ -63,6 +63,26 @@ const Tenant = sequelize.define('Tenant', {
     // JSON array of field definitions per tenant
     type: DataTypes.JSON,
     allowNull: true
+  },
+  stripeCustomerId: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  stripeSubscriptionId: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  stripePriceId: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  subscriptionStatus: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  subscriptionCurrentPeriodEnd: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 });
 

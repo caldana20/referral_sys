@@ -10,6 +10,8 @@ const rewardRoutes = require('./routes/rewardRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
 const metaRoutes = require('./routes/metaRoutes');
 const metricsRoutes = require('./routes/metricsRoutes');
+const billingRoutes = require('./routes/billingRoutes');
+const billingController = require('./controllers/billingController');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 require('dotenv').config();
@@ -65,6 +67,18 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
+
+// Stripe webhook needs raw body; register before JSON parser
+app.post(
+  '/api/billing/webhook',
+  express.raw({ type: 'application/json' }),
+  (req, _res, next) => {
+    req.rawBody = req.body;
+    next();
+  },
+  billingController.handleWebhook
+);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static('uploads'));
@@ -80,6 +94,7 @@ app.use('/api/rewards', rewardRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/meta', metaRoutes);
 app.use('/api/metrics', metricsRoutes);
+app.use('/api/billing', billingRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
