@@ -12,19 +12,38 @@ async function getPrimaryHost(tenantId) {
 }
 
 async function buildTenantBaseUrl(tenantId) {
-  const host =
-    (await getPrimaryHost(tenantId)) ||
-    (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000');
+  const tenant = await Tenant.findByPk(tenantId);
+  if (!tenant || !tenant.slug) {
+    throw new Error('Tenant slug not found for referral URL generation');
+  }
+  const tenantSlug = tenant.slug;
 
-  const protocol = process.env.CLIENT_PROTOCOL || (host.startsWith('http') ? '' : 'http');
-  let cleanHost = host.replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-  const hasPort = cleanHost.includes(':');
-  if (cleanHost.includes('localhost') && !hasPort) {
-    cleanHost = `${cleanHost}:${process.env.CLIENT_PORT || '3000'}`;
+  const primaryHost = await getPrimaryHost(tenantId);
+  if (primaryHost) {
+    const protocol = process.env.CLIENT_PROTOCOL || (primaryHost.startsWith('http') ? '' : 'https');
+    let clean = primaryHost.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    if (clean.includes('localhost') && !clean.includes(':')) {
+      clean = `${clean}:${process.env.CLIENT_PORT || '3000'}`;
+    }
+    return `${protocol ? `${protocol}://` : ''}${clean}`;
   }
 
-  return `${protocol ? `${protocol}://` : ''}${cleanHost}`;
+  let base = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000';
+  const protocol = process.env.CLIENT_PROTOCOL || (base.startsWith('http') ? '' : 'https');
+  let clean = base.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+  if (clean.includes('*')) {
+    clean = clean
+      .replace('*.', `${tenantSlug}.`)
+      .replace('*', tenantSlug)
+      .replace(/^\.\./, '.');
+  }
+
+  if (clean.includes('localhost') && !clean.includes(':')) {
+    clean = `${clean}:${process.env.CLIENT_PORT || '3000'}`;
+  }
+
+  return `${protocol ? `${protocol}://` : ''}${clean}`;
 }
 
 exports.createReferral = async (req, res) => {
@@ -40,6 +59,22 @@ exports.createReferral = async (req, res) => {
         ? await Tenant.findByPk(req.tenant.tenantId)
         : null;
     if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
+    const bypassBilling =
+      (process.env.FREE_TENANT_SLUG && process.env.FREE_TENANT_SLUG === tenant.slug) ||
+      (process.env.FREE_TENANT_NAME && process.env.FREE_TENANT_NAME === tenant.name);
+
+    // Enforce free tier limit: if not active subscription, allow up to 5 referrals
+    const isActive = tenant.subscriptionStatus === 'active';
+    if (!isActive && !bypassBilling) {
+      const referralCount = await Referral.count({ where: { tenantId: tenant.id } });
+      if (referralCount >= 5) {
+        return res.status(403).json({
+          message: 'Free limit reached. Subscribe to create more referrals.',
+          code: 'REFERRAL_LIMIT_REACHED'
+        });
+      }
+    }
 
     const companyName = tenant.name || 'Your Company';
     const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;

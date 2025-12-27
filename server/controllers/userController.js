@@ -325,19 +325,38 @@ async function getPrimaryHost(tenantId) {
 }
 
 async function buildTenantBaseUrl(tenantId) {
-  const host =
-    (await getPrimaryHost(tenantId)) ||
-    (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000');
+  const tenant = await Tenant.findByPk(tenantId);
+  if (!tenant || !tenant.slug) {
+    throw new Error('Tenant slug not found for referral URL generation');
+  }
+  const tenantSlug = tenant.slug;
 
-  const protocol = process.env.CLIENT_PROTOCOL || (host.startsWith('http') ? '' : 'http');
-  let cleanHost = host.replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-  const hasPort = cleanHost.includes(':');
-  if (cleanHost.includes('localhost') && !hasPort) {
-    cleanHost = `${cleanHost}:${process.env.CLIENT_PORT || '3000'}`;
+  const primaryHost = await getPrimaryHost(tenantId);
+  if (primaryHost) {
+    const protocol = process.env.CLIENT_PROTOCOL || (primaryHost.startsWith('http') ? '' : 'https');
+    let clean = primaryHost.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    if (clean.includes('localhost') && !clean.includes(':')) {
+      clean = `${clean}:${process.env.CLIENT_PORT || '3000'}`;
+    }
+    return `${protocol ? `${protocol}://` : ''}${clean}`;
   }
 
-  return `${protocol ? `${protocol}://` : ''}${cleanHost}`;
+  let base = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000';
+  const protocol = process.env.CLIENT_PROTOCOL || (base.startsWith('http') ? '' : 'https');
+  let clean = base.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+  if (clean.includes('*')) {
+    clean = clean
+      .replace('*.', `${tenantSlug}.`)
+      .replace('*', tenantSlug)
+      .replace(/^\.\./, '.');
+  }
+
+  if (clean.includes('localhost') && !clean.includes(':')) {
+    clean = `${clean}:${process.env.CLIENT_PORT || '3000'}`;
+  }
+
+  return `${protocol ? `${protocol}://` : ''}${clean}`;
 }
 
 exports.generateClientReferralLink = async (req, res) => {

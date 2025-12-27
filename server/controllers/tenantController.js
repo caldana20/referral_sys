@@ -154,7 +154,15 @@ exports.getSettings = async (req, res) => {
       name: tenant.name,
       slug: tenant.slug,
       logoUrl: tenant.logoUrl,
-      sendgridFromEmail: tenant.sendgridFromEmail
+      sendgridFromEmail: tenant.sendgridFromEmail,
+      stripeCustomerId: tenant.stripeCustomerId,
+      stripeSubscriptionId: tenant.stripeSubscriptionId,
+      stripePriceId: tenant.stripePriceId,
+      subscriptionStatus: tenant.subscriptionStatus,
+      subscriptionCurrentPeriodEnd: tenant.subscriptionCurrentPeriodEnd,
+      billingBypass:
+        (process.env.FREE_TENANT_SLUG && process.env.FREE_TENANT_SLUG === tenant.slug) ||
+        (process.env.FREE_TENANT_NAME && process.env.FREE_TENANT_NAME === tenant.name)
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to load settings', error: err.message });
@@ -189,7 +197,15 @@ exports.updateSettings = async (req, res) => {
       name: tenant.name,
       slug: tenant.slug,
       logoUrl: tenant.logoUrl,
-      sendgridFromEmail: tenant.sendgridFromEmail
+      sendgridFromEmail: tenant.sendgridFromEmail,
+      stripeCustomerId: tenant.stripeCustomerId,
+      stripeSubscriptionId: tenant.stripeSubscriptionId,
+      stripePriceId: tenant.stripePriceId,
+      subscriptionStatus: tenant.subscriptionStatus,
+      subscriptionCurrentPeriodEnd: tenant.subscriptionCurrentPeriodEnd,
+      billingBypass:
+        (process.env.FREE_TENANT_SLUG && process.env.FREE_TENANT_SLUG === tenant.slug) ||
+        (process.env.FREE_TENANT_NAME && process.env.FREE_TENANT_NAME === tenant.name)
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to update settings', error: err.message });

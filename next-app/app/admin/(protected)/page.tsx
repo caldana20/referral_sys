@@ -8,6 +8,8 @@ import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type Trend = { weekStart: string; open: number; used: number; closed: number };
 type TopReferrer = { userId: number; name: string; email: string; count: number };
@@ -38,6 +40,11 @@ type RecommendationsResponse = {
   recommendations: Recommendation[];
 };
 
+type TenantSettings = {
+  subscriptionStatus?: string | null;
+  billingBypass?: boolean;
+};
+
 function Bar({ value, max, color = "bg-blue-500" }: { value: number; max: number; color?: string }) {
   const width = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0;
   return (
@@ -55,19 +62,29 @@ export default function AdminHomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recsError, setRecsError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<TenantSettings | null>(null);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await apiFetch<DashboardMetrics>("/api/metrics/dashboard", {
-          onUnauthorized: () => {
-            logout();
-            router.replace("/admin/login");
-          },
-        });
-        setData(res);
+        const [metricsRes, settingsRes] = await Promise.all([
+          apiFetch<DashboardMetrics>("/api/metrics/dashboard", {
+            onUnauthorized: () => {
+              logout();
+              router.replace("/admin/login");
+            },
+          }),
+          apiFetch<TenantSettings>("/api/tenants/settings", {
+            onUnauthorized: () => {
+              logout();
+              router.replace("/admin/login");
+            },
+          }),
+        ]);
+        setData(metricsRes);
+        setSettings(settingsRes);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to load metrics";
         setError(message);
@@ -108,9 +125,24 @@ export default function AdminHomePage() {
   if (!data) return null;
 
   const { summary, trends, topReferrers, topRewards } = data;
+  const subStatus = settings?.subscriptionStatus || "none";
+  const bypass = settings?.billingBypass === true;
+  const atLimit = !bypass && subStatus !== "active" && (summary?.totalReferrals ?? 0) >= 5;
 
   return (
     <div className="space-y-6">
+      {atLimit && (
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertTitle className="text-amber-900">Free limit reached</AlertTitle>
+          <AlertDescription className="text-amber-800">
+            You’ve created 5 referrals on the free tier. Subscribe to create more referral links.{" "}
+            <Link href="/admin/billing" className="underline font-medium">
+              Go to Billing
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader>
