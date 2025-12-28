@@ -8,9 +8,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 ARG NEXT_PUBLIC_API_BASE_URL
-ARG NEXT_PUBLIC_HOST
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
-ENV NEXT_PUBLIC_HOST=${NEXT_PUBLIC_HOST}
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -25,7 +23,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 # Runtime env (used by server components and API client)
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
-ENV NEXT_PUBLIC_HOST=${NEXT_PUBLIC_HOST}
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next

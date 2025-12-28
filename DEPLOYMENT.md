@@ -72,7 +72,6 @@ Key backend envs to set (server/.env):
 
 Frontend/compose env (project `.env` and `next-app/.env.local`):
 - `NEXT_PUBLIC_API_BASE_URL=https://*.tenant.refoza.com/api`
-- `NEXT_PUBLIC_HOST=*.tenant.refoza.com`
 
 ## 7) Build and run
 ```bash
