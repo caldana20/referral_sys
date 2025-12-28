@@ -1,56 +1,37 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Deployment script for Google Cloud VM
-# Run this script on the VM after SSH'ing into it
+# Bootstrap a fresh Ubuntu VM for Docker + Nginx + certbot.
+# Run this after SSH'ing into the VM.
 
-set -e  # Exit on error
+echo "Updating packages..."
+sudo apt-get update -y
+sudo apt-get upgrade -y
 
-echo "🚀 Starting deployment setup..."
+echo "Installing prerequisites..."
+sudo apt-get install -y ca-certificates curl gnupg lsb-release
 
-# Update system
-echo "📦 Updating system packages..."
-sudo apt-get update && sudo apt-get upgrade -y
+echo "Installing Docker Engine..."
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update -y
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Install Node.js
-if ! command -v node &> /dev/null; then
-    echo "📦 Installing Node.js..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-    sudo apt-get install -y nodejs
-else
-    echo "✅ Node.js already installed: $(node --version)"
-fi
+echo "Adding current user to docker group (log out/in to apply)..."
+sudo usermod -aG docker "$USER"
 
-# Install Git
-if ! command -v git &> /dev/null; then
-    echo "📦 Installing Git..."
-    sudo apt-get install -y git
-else
-    echo "✅ Git already installed"
-fi
-
-# Install PM2
-if ! command -v pm2 &> /dev/null; then
-    echo "📦 Installing PM2..."
-    sudo npm install -g pm2
-else
-    echo "✅ PM2 already installed"
-fi
-
-# Install Nginx
-if ! command -v nginx &> /dev/null; then
-    echo "📦 Installing Nginx..."
-    sudo apt-get install -y nginx
-else
-    echo "✅ Nginx already installed"
-fi
+echo "Installing Git, Nginx, certbot..."
+sudo apt-get install -y git nginx certbot python3-certbot-nginx
 
 echo ""
-echo "✅ Basic software installation complete!"
-echo ""
-echo "Next steps:"
-echo "1. Clone your repository: git clone <your-repo-url> ~/referral-system"
-echo "2. Install dependencies: cd ~/referral-system && npm install && cd server && npm install && cd ../client && npm install"
-echo "3. Build frontend: cd ~/referral-system/client && npm run build"
-echo "4. Set up .env file in server directory"
-echo "5. Configure PM2 and Nginx (see DEPLOYMENT.md for details)"
+echo "Done. Next steps on the VM:"
+echo "1) Re-login or 'newgrp docker' so Docker group applies."
+echo "2) Clone the repo under /opt/referral_sys (or preferred path)."
+echo "3) Copy env templates: server/env.example -> server/.env, env.compose.example -> .env, next-app/env.local.example -> next-app/.env.local."
+echo "4) docker compose build && docker compose up -d"
+echo "5) Configure Nginx from nginx.conf.example, then obtain certs with certbot."
+echo "6) Run migrations/seeds: ./scripts/compose-migrate.sh"
 
