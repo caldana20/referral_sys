@@ -24,11 +24,9 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
-        NEXT_PUBLIC_HOST: ${NEXT_PUBLIC_HOST}
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
-      - NEXT_PUBLIC_HOST=${NEXT_PUBLIC_HOST}
     depends_on:
       - backend
     ports:
