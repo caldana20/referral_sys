@@ -8,8 +8,10 @@ export const API_BASE_URL = resolvedApiBase;
 export const isBrowser = typeof window !== "undefined";
 
 // Host used to resolve tenant context on the frontend
-export const CURRENT_HOST = (() => {
-  if (typeof window !== "undefined") return window.location.hostname;
-  throw new Error("CURRENT_HOST unavailable: window is undefined (set at runtime)");
-})();
+const envHost = process.env.NEXT_PUBLIC_SITE_HOST || process.env.NEXT_PUBLIC_API_HOST;
+if (!isBrowser && !envHost) {
+  throw new Error("Set NEXT_PUBLIC_SITE_HOST for SSR host resolution");
+}
+
+export const CURRENT_HOST = isBrowser ? window.location.hostname : envHost as string;
 
