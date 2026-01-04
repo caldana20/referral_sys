@@ -1,7 +1,11 @@
 require('dotenv').config();
 const { Tenant, TenantHost, sequelize } = require('../models');
 
-const DEFAULT_BASE = process.env.HOST_BASE || 'localhost';
+// Normalize HOST_BASE to avoid embedded wildcards or protocols
+const DEFAULT_BASE = (() => {
+  const raw = process.env.HOST_BASE || 'localhost';
+  return raw.replace(/^https?:\/\//, '').replace(/^\*\./, '').replace(/\/$/, '');
+})();
 
 async function main() {
   try {

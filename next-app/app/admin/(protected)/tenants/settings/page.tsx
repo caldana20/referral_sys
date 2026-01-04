@@ -17,6 +17,16 @@ type TenantSettings = {
   logoUrl?: string | null;
 };
 
+type SenderInfo = {
+  exists: boolean;
+  fromName?: string;
+  fromEmail?: string;
+  sendgridSenderId?: string;
+  status?: string;
+  verified?: boolean;
+  lastError?: string | null;
+};
+
 export default function TenantSettingsPage() {
   const router = useRouter();
   const { logout } = useAuth();
@@ -25,9 +35,16 @@ export default function TenantSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [sender, setSender] = useState<SenderInfo | null>(null);
+  const [senderLoading, setSenderLoading] = useState(false);
+  const [fromName, setFromName] = useState("");
+  const [fromEmail, setFromEmail] = useState("");
+  const [testRecipient, setTestRecipient] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
 
   useEffect(() => {
     const load = async () => {
+      setSenderLoading(true);
       try {
         const res = await apiFetch<TenantSettings>("/api/tenants/settings", {
           onUnauthorized: () => {
@@ -37,9 +54,20 @@ export default function TenantSettingsPage() {
         });
         setSettings(res);
         setName(res?.name || "");
+        const senderRes = await apiFetch<SenderInfo>("/api/senders", {
+          onUnauthorized: () => {
+            logout();
+            router.replace("/admin/login");
+          },
+        });
+        setSender(senderRes);
+        if (senderRes?.fromName) setFromName(senderRes.fromName);
+        if (senderRes?.fromEmail) setFromEmail(senderRes.fromEmail);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to load settings";
         toast.error(message);
+      } finally {
+        setSenderLoading(false);
       }
     };
     load();
@@ -80,49 +108,178 @@ export default function TenantSettingsPage() {
     }
   };
 
+  const handleCreateSender = async () => {
+    if (!fromName.trim() || !fromEmail.trim()) {
+      toast.error("Sender name and email are required");
+      return;
+    }
+    setSenderLoading(true);
+    try {
+      const res = await apiFetch<SenderInfo>("/api/senders", {
+        method: "POST",
+          body: JSON.stringify({
+            fromName: fromName.trim(),
+            fromEmail: fromEmail.trim(),
+          }),
+        headers: { "Content-Type": "application/json" },
+        onUnauthorized: () => {
+          logout();
+          router.replace("/admin/login");
+        },
+      });
+      setSender(res);
+      toast.success("Verification email sent. Please check the inbox and click the SendGrid link.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create sender";
+      toast.error(message);
+    } finally {
+      setSenderLoading(false);
+    }
+  };
+
+  const handleRefreshSender = async () => {
+    setSenderLoading(true);
+    try {
+      const res = await apiFetch<SenderInfo>("/api/senders", {
+        onUnauthorized: () => {
+          logout();
+          router.replace("/admin/login");
+        },
+      });
+      setSender(res);
+      toast.success("Sender status refreshed");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to refresh sender";
+      toast.error(message);
+    } finally {
+      setSenderLoading(false);
+    }
+  };
+
+  const handleSendTest = async () => {
+    if (!testRecipient.trim()) {
+      toast.error("Enter a test recipient email");
+      return;
+    }
+    setSendingTest(true);
+    try {
+      await apiFetch("/api/senders/test", {
+        method: "POST",
+        body: JSON.stringify({ to: testRecipient.trim() }),
+        headers: { "Content-Type": "application/json" },
+        onUnauthorized: () => {
+          logout();
+          router.replace("/admin/login");
+        },
+      });
+      toast.success("Test email sent");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to send test email";
+      toast.error(message);
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Tenant Settings</CardTitle>
-        <CardDescription>Update tenant name. (Logo upload not yet wired in this UI.)</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-1">
-          <Label>Name</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label>Slug</Label>
-          <Input value={settings?.slug || ""} disabled />
-        </div>
-        {settings?.logoUrl ? (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Tenant Settings</CardTitle>
+          <CardDescription>Update tenant name and logo.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <div className="space-y-1">
-            <Label>Logo</Label>
-            <img
-              src={logoPreview || settings.logoUrl}
-              alt="Tenant logo"
-              className="h-12 w-12 rounded border object-contain"
+            <Label>Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Slug</Label>
+            <Input value={settings?.slug || ""} disabled />
+          </div>
+          {settings?.logoUrl ? (
+            <div className="space-y-1">
+              <Label>Logo</Label>
+              <img
+                src={logoPreview || settings.logoUrl}
+                alt="Tenant logo"
+                className="h-12 w-12 rounded border object-contain"
+              />
+            </div>
+          ) : null}
+          <div className="space-y-1">
+            <Label>Upload New Logo</Label>
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setLogoFile(file);
+                setLogoPreview(file ? URL.createObjectURL(file) : null);
+              }}
             />
           </div>
-        ) : null}
-        <div className="space-y-1">
-          <Label>Upload New Logo</Label>
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0] || null;
-              setLogoFile(file);
-              setLogoPreview(file ? URL.createObjectURL(file) : null);
-            }}
-          />
-        </div>
-        <Button onClick={handleSave} disabled={saving || !name.trim()}>
-          {saving ? "Saving..." : "Save"}
-        </Button>
+          <Button onClick={handleSave} disabled={saving || !name.trim()}>
+            {saving ? "Saving..." : "Save"}
+          </Button>
+        </CardContent>
+      </Card>
 
-      </CardContent>
-    </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Tenant Sender (SendGrid Single Sender)</CardTitle>
+          <CardDescription>
+            Create a tenant-specific sender. SendGrid will email a verification link to the From address. The link
+            must be clicked before emails can be sent from this sender. Address fields are required by SendGrid for
+            single sender.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label>From Name</Label>
+              <Input value={fromName} onChange={(e) => setFromName(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>From Email</Label>
+              <Input value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={handleCreateSender} disabled={senderLoading}>
+              {senderLoading ? "Working..." : sender?.exists ? "Resend Verification" : "Create Sender"}
+            </Button>
+            <Button variant="outline" onClick={handleRefreshSender} disabled={senderLoading}>
+              Refresh Status
+            </Button>
+          </div>
+
+          {sender ? (
+            <div className="space-y-1 text-sm">
+              <div>Status: {sender.verified ? "Verified" : sender.status || "Unknown"}</div>
+              {sender.fromEmail ? <div>Current: {sender.fromName} &lt;{sender.fromEmail}&gt;</div> : null}
+              {sender.lastError ? <div className="text-red-600">Last error: {sender.lastError}</div> : null}
+              {sender.sendgridSenderId ? <div>Sender ID: {sender.sendgridSenderId}</div> : null}
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label>Send Test Email (requires verified sender)</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="recipient@example.com"
+                value={testRecipient}
+                onChange={(e) => setTestRecipient(e.target.value)}
+              />
+              <Button onClick={handleSendTest} disabled={sendingTest || !sender?.verified}>
+                {sendingTest ? "Sending..." : "Send Test"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

@@ -14,8 +14,10 @@ exports.createEstimate = async (req, res) => {
     }
     if (!tenant) return res.status(404).json({ message: 'Invalid tenant' });
     const companyName = tenant.name || 'Your Company';
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
-    if (!fromEmail) return res.status(500).json({ message: 'Server email sender not configured' });
+    const tenantSender = await require('./senderController').resolveTenantSender(tenant.id);
+    const fromEmail = tenantSender?.fromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    const fromName = tenantSender?.fromName || companyName;
+    if (!fromEmail) return res.status(500).json({ message: 'Sender not configured. Configure tenant sender or set SENDGRID_FROM_EMAIL.' });
 
     const referral = await Referral.findOne({ 
       where: { code: referralCode, tenantId: tenant.id },
@@ -132,13 +134,13 @@ exports.createEstimate = async (req, res) => {
         `;
 
         // Send email asynchronously
-        console.log('Email send (estimate->admins)', { tenant: tenant.slug, fromEmail, to: adminEmails });
+        console.log('Email send (estimate->admins)', { tenant: tenant.slug, fromEmail, fromName, to: adminEmails });
         sendEmail({
           to: adminEmails,
           subject: `New Estimate Request Received - ${companyName}`,
           html: emailContent,
           fromEmail,
-          fromName: companyName
+          fromName
         });
       }
     } catch (emailError) {
@@ -189,13 +191,13 @@ exports.createEstimate = async (req, res) => {
               </div>
             `;
 
-            console.log('Email send (estimate->referrer)', { tenant: tenant.slug, fromEmail, to: referrerEmail });
+            console.log('Email send (estimate->referrer)', { tenant: tenant.slug, fromEmail, fromName, to: referrerEmail });
             sendEmail({
                 to: referrerEmail,
                 subject: `Your ${companyName} Referral Code was Used! 🎉`,
                 html: clientEmailHtml,
                 fromEmail,
-                fromName: companyName
+                fromName
             }).catch(err => console.error('Failed to send referrer confirmation email:', err));
         }
     } catch (clientEmailError) {
@@ -254,13 +256,13 @@ exports.createEstimate = async (req, res) => {
           </div>
         `;
 
-        console.log('Email send (estimate->prospect)', { tenant: tenant.slug, fromEmail, to: email });
+        console.log('Email send (estimate->prospect)', { tenant: tenant.slug, fromEmail, fromName, to: email });
         sendEmail({
             to: email,
             subject: `Your Estimate Request Has Been Received ✨`,
             html: prospectEmailHtml,
             fromEmail,
-            fromName: companyName
+            fromName
         }).catch(err => console.error('Failed to send prospect confirmation email:', err));
     } catch (prospectEmailError) {
         console.error('Failed to trigger prospect email notification:', prospectEmailError);
