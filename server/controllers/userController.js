@@ -215,8 +215,10 @@ exports.sendInvitations = async (req, res) => {
     }
 
     const companyName = tenant.name || 'Your Company';
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
-    if (!fromEmail) return res.status(500).json({ message: 'Server email sender not configured' });
+    const tenantSender = await require('./senderController').resolveTenantSender(tenantId);
+    const fromEmail = tenantSender?.fromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    const fromName = tenantSender?.fromName || companyName;
+    if (!fromEmail) return res.status(500).json({ message: 'Sender not configured. Configure tenant sender or set SENDGRID_FROM_EMAIL.' });
     const host = (await getPrimaryHost(tenant.id)) || (process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000');
     const protocol = process.env.CLIENT_PROTOCOL || (host.startsWith('http') ? '' : 'http');
     const cleanHost = host.replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -293,7 +295,7 @@ exports.sendInvitations = async (req, res) => {
           subject: `Start Earning Rewards with ${companyName}! 🎁`,
           html: emailHtml,
           fromEmail,
-          fromName: companyName
+          fromName
         });
 
         sentCount++;

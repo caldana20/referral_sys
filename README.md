@@ -25,3 +25,15 @@ SENDGRID_FROM_EMAIL=noreply@yourdomain.com
 Notes:
 - `SENDGRID_FROM_EMAIL` must be a verified sender.
 - `EMAIL_USER` can be used as a fallback for sender email.
+
+## Tenant-specific SendGrid Single Sender (per-tenant From)
+- Set these address envs (required by SendGrid single sender):
+```
+SENDGRID_SENDER_ADDRESS=123 Main St
+SENDGRID_SENDER_CITY=City
+SENDGRID_SENDER_STATE=ST
+SENDGRID_SENDER_ZIP=12345
+SENDGRID_SENDER_COUNTRY=US
+```
+- Admin UI → Tenant Settings now lets you enter a per-tenant From name/email, sends the SendGrid verification email, shows status, and sends a test email once verified.
+- SendGrid still requires the tenant to click the verification link in the email before the sender can be used.

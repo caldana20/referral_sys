@@ -77,9 +77,12 @@ exports.createReferral = async (req, res) => {
     }
 
     const companyName = tenant.name || 'Your Company';
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    // Resolve tenant sender first; fallback to global
+    const tenantSender = await require('./senderController').resolveTenantSender(tenant.id);
+    const fromEmail = tenantSender?.fromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    const fromName = tenantSender?.fromName || companyName;
     if (!fromEmail) {
-      return res.status(500).json({ message: 'Server email sender not configured' });
+      return res.status(500).json({ message: 'Sender not configured. Configure tenant sender or set SENDGRID_FROM_EMAIL.' });
     }
 
     // Check if client exists in this tenant
@@ -162,13 +165,13 @@ exports.createReferral = async (req, res) => {
     `;
 
     // Send to Client
-    console.log('Email send (referral->client)', { tenant: tenant.slug, fromEmail, to: user.email });
+    console.log('Email send (referral->client)', { tenant: tenant.slug, fromEmail, fromName, to: user.email });
     sendEmail({
       to: user.email,
       subject: clientEmailSubject,
       html: clientEmailHtml,
       fromEmail,
-      fromName: companyName
+      fromName
     }).catch(err => console.error('Failed to send referral confirmation email to client:', err));
 
     // --- Send Email to Admins ---
@@ -198,13 +201,13 @@ exports.createReferral = async (req, res) => {
               </div>
             `;
 
-            console.log('Email send (referral->admins)', { tenant: tenant.slug, fromEmail, to: adminEmails });
+            console.log('Email send (referral->admins)', { tenant: tenant.slug, fromEmail, fromName, to: adminEmails });
             sendEmail({
                 to: adminEmails,
                 subject: `New ${companyName} Referral Link Generated`,
                 html: adminEmailHtml,
                 fromEmail,
-                fromName: companyName
+                fromName
             }).catch(err => console.error('Failed to send admin notification for new referral:', err));
         }
     } catch (adminErr) {
@@ -255,8 +258,10 @@ exports.updateReferralStatus = async (req, res) => {
 
     const tenant = await Tenant.findByPk(req.user.tenantId);
     const companyName = tenant?.name || 'Your Company';
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
-    if (!fromEmail) return res.status(500).json({ message: 'Server email sender not configured' });
+    const tenantSender = await require('./senderController').resolveTenantSender(req.user.tenantId);
+    const fromEmail = tenantSender?.fromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
+    const fromName = tenantSender?.fromName || companyName;
+    if (!fromEmail) return res.status(500).json({ message: 'Sender not configured. Configure tenant sender or set SENDGRID_FROM_EMAIL.' });
 
     const previousStatus = referral.status;
     referral.status = status;
@@ -311,10 +316,10 @@ exports.updateReferralStatus = async (req, res) => {
           subject: `Your ${companyName} Reward Has Been Activated! 🎉`,
           html: clientEmailHtml,
           fromEmail,
-          fromName: companyName
+          fromName
         });
 
-        console.log(`Reward closure email sent to ${referral.User.email} for referral ${referral.code}`);
+        console.log(`Reward closure email sent to ${referral.User.email} for referral ${referral.code}`, { fromEmail, fromName });
       } catch (emailError) {
         console.error(`Failed to send reward closure email to ${referral.User.email}:`, emailError);
         // Don't fail the request if email fails
