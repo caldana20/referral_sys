@@ -7,6 +7,7 @@ const { authenticateToken, requireAdmin } = require('../middleware/authMiddlewar
 router.get('/', authenticateToken, requireAdmin, senderController.getSender);
 router.post('/', authenticateToken, requireAdmin, senderController.createSender);
 router.post('/test', authenticateToken, requireAdmin, senderController.sendTestEmail);
+router.delete('/', authenticateToken, requireAdmin, senderController.resetSender);
 
 module.exports = router;
 

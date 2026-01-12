@@ -88,6 +88,7 @@ exports.createEstimate = async (req, res) => {
     const estimate = await Estimate.create({
       referralId: referral.id,
       tenantId: referral.tenantId || null,
+      campaignId: referral.campaignId || null,
       name,
       email,
       phone,
@@ -292,7 +293,8 @@ exports.getEstimateById = async (req, res) => {
     const estimate = await Estimate.findOne({
       where: { id, tenantId: req.user.tenantId },
       include: [
-        { model: Referral, include: [{ model: User, attributes: ['name', 'email'] }] }
+        { model: Referral, include: [{ model: User, attributes: ['name', 'email'] }, { model: require('../models').Campaign, attributes: ['id', 'name'] }] },
+        { model: require('../models').Campaign, attributes: ['id', 'name'] }
       ]
     });
 

@@ -33,6 +33,7 @@ async function resolveSender(tenantId) {
 }
 
 async function callSendGrid(path, { method = 'GET', body } = {}) {
+  console.info('SendGrid request:', { path, method, body: body || null });
   if (!SENDGRID_API_KEY) {
     const err = new Error('SENDGRID_API_KEY not configured');
     err.status = 500;
@@ -49,6 +50,7 @@ async function callSendGrid(path, { method = 'GET', body } = {}) {
   });
 
   const text = await res.text();
+  console.info('SendGrid response:', { path, method, status: res.status, statusText: res.statusText, body: text || null });
   let json = null;
   try {
     json = text ? JSON.parse(text) : null;
@@ -81,6 +83,13 @@ exports.createSender = async (req, res) => {
   if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
 
   const address = resolveAddress(req.body, tenant);
+  console.info('createSender resolved inputs:', {
+    tenantId,
+    fromName: trimmedFromName,
+    fromEmail: trimmedFromEmail,
+    address
+  });
+
   if (!address) {
     return res.status(400).json({
       message: 'Address required: provide address, city, state, zip, country (fill here or in tenant profile).'
@@ -105,7 +114,7 @@ exports.createSender = async (req, res) => {
       country: address.country
     };
 
-    console.log('SendGrid sender payload:', payload);
+    console.info('createSender payload (pre-SendGrid):', payload);
 
     const sgResponse = await callSendGrid('/marketing/senders', { method: 'POST', body: payload });
     const senderId = sgResponse?.id?.toString();
@@ -120,7 +129,15 @@ exports.createSender = async (req, res) => {
         verified: false,
         lastError: null
       });
-      return res.json({ message: 'Sender updated and verification email sent', senderId });
+      return res.json({
+        exists: true,
+        fromName: trimmedFromName,
+        fromEmail: trimmedFromEmail,
+        sendgridSenderId: senderId,
+        status: 'pending',
+        verified: false,
+        lastError: null
+      });
     }
 
     await TenantSender.create({
@@ -132,7 +149,15 @@ exports.createSender = async (req, res) => {
       verified: false
     });
 
-    return res.json({ message: 'Sender created and verification email sent', senderId });
+    return res.json({
+      exists: true,
+      fromName: trimmedFromName,
+      fromEmail: trimmedFromEmail,
+      sendgridSenderId: senderId,
+      status: 'pending',
+      verified: false,
+      lastError: null
+    });
   } catch (err) {
     console.error('createSender failed:', err);
     return res.status(err.status || 500).json({ message: err.body?.errors?.[0]?.message || err.message || 'Failed to create sender' });
@@ -191,6 +216,13 @@ exports.sendTestEmail = async (req, res) => {
     if (!record) return res.status(400).json({ message: 'No sender configured' });
     if (!record.verified) return res.status(400).json({ message: 'Sender not verified yet' });
 
+    console.info('sendTestEmail payload:', {
+      to,
+      subject: 'Test email from your tenant sender',
+      fromEmail: record.fromEmail,
+      fromName: record.fromName
+    });
+
     const result = await sendEmail({
       to,
       subject: 'Test email from your tenant sender',
@@ -207,6 +239,36 @@ exports.sendTestEmail = async (req, res) => {
   } catch (err) {
     console.error('sendTestEmail failed:', err);
     return res.status(500).json({ message: 'Failed to send test email' });
+  }
+};
+
+exports.resetSender = async (req, res) => {
+  const tenantId = req.user?.tenantId;
+  if (!tenantId) return res.status(400).json({ message: 'Missing tenant context' });
+
+  try {
+    const record = await TenantSender.findOne({ where: { tenantId } });
+    if (!record) return res.json({ message: 'No sender configured', exists: false });
+
+    if (record.sendgridSenderId) {
+      try {
+        console.info('resetSender: deleting SendGrid sender', { tenantId, sendgridSenderId: record.sendgridSenderId });
+        await callSendGrid(`/marketing/senders/${record.sendgridSenderId}`, { method: 'DELETE' });
+      } catch (err) {
+        // Log but continue so the tenant can still reset locally
+        console.error('resetSender: failed to delete SendGrid sender', {
+          tenantId,
+          sendgridSenderId: record.sendgridSenderId,
+          error: err?.body || err?.message || err
+        });
+      }
+    }
+
+    await record.destroy();
+    return res.json({ message: 'Sender reset; configure a new sender', exists: false });
+  } catch (err) {
+    console.error('resetSender failed:', err);
+    return res.status(500).json({ message: 'Failed to reset sender' });
   }
 };
 

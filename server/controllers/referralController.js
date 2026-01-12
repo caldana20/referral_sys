@@ -11,6 +11,26 @@ async function getPrimaryHost(tenantId) {
   return host ? host.host : null;
 }
 
+function replaceWildcardHost(raw, tenantSlug) {
+  if (!raw) return raw;
+  let clean = raw;
+  try {
+    clean = decodeURIComponent(clean);
+  } catch (_) {
+    // ignore decode errors, use original
+  }
+  clean = clean.replace(/%2A/gi, '*');
+  clean = clean
+    .replace(/^\*+\./, `${tenantSlug}.`)
+    .replace(/\.\*+\./g, `.${tenantSlug}.`)
+    .replace(/\.\*+$/g, `.${tenantSlug}`)
+    .replace(/\*+/g, tenantSlug)
+    .replace(/^\.\./, '.')
+    .replace(/\/+$/, '');
+  clean = clean.replace(new RegExp(`^(${tenantSlug}\\.)+`), `${tenantSlug}.`);
+  return clean;
+}
+
 async function buildTenantBaseUrl(tenantId) {
   const tenant = await Tenant.findByPk(tenantId);
   if (!tenant || !tenant.slug) {
@@ -21,7 +41,9 @@ async function buildTenantBaseUrl(tenantId) {
   const primaryHost = await getPrimaryHost(tenantId);
   if (primaryHost) {
     const protocol = process.env.CLIENT_PROTOCOL || (primaryHost.startsWith('http') ? '' : 'https');
-    let clean = primaryHost.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    let clean = replaceWildcardHost(primaryHost, tenantSlug)
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
     if (clean.includes('localhost') && !clean.includes(':')) {
       clean = `${clean}:${process.env.CLIENT_PORT || '3000'}`;
     }
@@ -30,14 +52,9 @@ async function buildTenantBaseUrl(tenantId) {
 
   let base = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000';
   const protocol = process.env.CLIENT_PROTOCOL || (base.startsWith('http') ? '' : 'https');
-  let clean = base.replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-  if (clean.includes('*')) {
-    clean = clean
-      .replace('*.', `${tenantSlug}.`)
-      .replace('*', tenantSlug)
-      .replace(/^\.\./, '.');
-  }
+  let clean = replaceWildcardHost(base, tenantSlug)
+    .replace(/^https?:\/\//, '')
+    .replace(/\/$/, '');
 
   if (clean.includes('localhost') && !clean.includes(':')) {
     clean = `${clean}:${process.env.CLIENT_PORT || '3000'}`;
@@ -46,9 +63,23 @@ async function buildTenantBaseUrl(tenantId) {
   return `${protocol ? `${protocol}://` : ''}${clean}`;
 }
 
+async function cloneReferralForReuse(referral) {
+  const code = crypto.randomBytes(4).toString('hex');
+  const newRef = await Referral.create({
+    tenantId: referral.tenantId,
+    userId: referral.userId,
+    code,
+    prospectEmail: referral.prospectEmail,
+    prospectName: referral.prospectName,
+    selectedReward: referral.selectedReward,
+    status: 'Open'
+  });
+  return newRef;
+}
+
 exports.createReferral = async (req, res) => {
   // Client identifies themselves
-  const { email, name, selectedReward, prospectName, prospectEmail, tenantSlug } = req.body;
+  const { email, name, selectedReward, prospectName, prospectEmail, tenantSlug, campaignId } = req.body;
   console.log('Creating referral request:', req.body);
 
   try {
@@ -109,12 +140,20 @@ exports.createReferral = async (req, res) => {
       return res.status(500).json({ message: 'Failed to generate referral code' });
     }
 
+    // Validate campaign belongs to tenant, if provided
+    let campaign = null;
+    if (campaignId) {
+      campaign = await require('../models').Campaign.findOne({ where: { id: campaignId, tenantId: tenant.id } });
+      if (!campaign) return res.status(400).json({ message: 'Invalid campaignId' });
+    }
+
     const referralData = {
       userId: user.id,
       tenantId: tenant.id,
       code,
       selectedReward,
-      status: 'Open'
+      status: 'Open',
+      campaignId: campaign ? campaign.id : null
     };
 
     if (prospectName) referralData.prospectName = prospectName;
@@ -228,7 +267,8 @@ exports.getReferrals = async (req, res) => {
       where: { tenantId: req.user.tenantId },
       include: [
         { model: User, attributes: ['name', 'email'] },
-        { model: Estimate, attributes: ['id', 'createdAt', 'name', 'email', 'customFields'], required: false }
+        { model: Estimate, attributes: ['id', 'createdAt', 'name', 'email', 'customFields'], required: false },
+        { model: require('../models').Campaign, attributes: ['id', 'name'] }
       ],
       order: [['createdAt', 'DESC']]
     });
@@ -335,31 +375,59 @@ exports.updateReferralStatus = async (req, res) => {
 exports.getReferralByCode = async (req, res) => {
   const { code } = req.params;
   try {
-    let tenant = null;
-    const { tenantSlug } = req.query;
-    if (tenantSlug) {
-      tenant = await Tenant.findOne({ where: { slug: tenantSlug } });
-    } else if (req.tenant?.tenantId) {
-      tenant = await Tenant.findByPk(req.tenant.tenantId);
-    }
+  const referral = await Referral.findOne({
+    where: { code },
+    include: [{ model: Estimate }, { model: Tenant, required: true }, { model: require('../models').Campaign, attributes: ['id', 'name'] }]
+  });
 
-    if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+  if (!referral) return res.status(404).json({ message: 'Invalid referral code' });
 
-    const referral = await Referral.findOne({ 
-      where: { code, tenantId: tenant.id },
+  // If tenantSlug was provided, ensure it matches the referral's tenant
+  const { tenantSlug } = req.query;
+  if (tenantSlug && referral.Tenant && referral.Tenant.slug !== tenantSlug) {
+    return res.status(404).json({ message: 'Invalid referral code' });
+  }
+
+  const tenant = referral.Tenant;
+  
+  const referralData = referral.toJSON();
+  const used = referral.Estimates && referral.Estimates.length > 0;
+
+  if (used) {
+    // Try to reuse an existing open referral for the same client with no estimates
+    let replacement = await Referral.findOne({
+      where: {
+        tenantId: referral.tenantId,
+        userId: referral.userId,
+        status: 'Open'
+      },
       include: [{ model: Estimate }]
     });
-    if (!referral) return res.status(404).json({ message: 'Invalid referral code' });
-    
-    const referralData = referral.toJSON();
-    referralData.used = referral.Estimates && referral.Estimates.length > 0;
-    referralData.tenant = {
-      name: tenant.name,
-      logoUrl: tenant.logoUrl || null
-    };
-    referralData.fieldConfig = tenant.estimateFieldConfig || getFieldsForTenant(tenant.slug);
 
-    res.json(referralData);
+    if (replacement && replacement.Estimates && replacement.Estimates.length > 0) {
+      replacement = null;
+    }
+
+    if (!replacement) {
+      replacement = await cloneReferralForReuse(referral);
+    }
+
+    referralData.used = true;
+    referralData.newCode = replacement.code;
+  } else {
+    referralData.used = false;
+  }
+
+  referralData.tenant = {
+    name: tenant.name,
+    logoUrl: tenant.logoUrl || null
+  };
+  if (referral.Campaign) {
+    referralData.campaign = { id: referral.Campaign.id, name: referral.Campaign.name };
+  }
+  referralData.fieldConfig = tenant.estimateFieldConfig || getFieldsForTenant(tenant.slug);
+
+  res.json(referralData);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
