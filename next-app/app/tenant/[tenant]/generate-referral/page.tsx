@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiFetch } from "@/lib/api-client";
 
 type Reward = { id: number; name: string; active?: boolean };
+type AllowedReward = { id: number; name: string };
 
 export default function GenerateReferralPage() {
   const { tenant } = useParams<{ tenant: string }>();
@@ -19,12 +20,12 @@ export default function GenerateReferralPage() {
 
   const [step, setStep] = useState(1);
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [allowedRewards, setAllowedRewards] = useState<AllowedReward[] | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    prospectName: "",
-    prospectEmail: "",
     selectedReward: "",
+    campaignId: null as string | null,
   });
   const [generatedLink, setGeneratedLink] = useState("");
   const [error, setError] = useState("");
@@ -33,6 +34,16 @@ export default function GenerateReferralPage() {
 
   const tenantSlug = useMemo(() => tenant || searchParams.get("tenant") || "", [tenant, searchParams]);
   const token = searchParams.get("token");
+
+  const rewardOptions = useMemo(() => {
+    if (allowedRewards && allowedRewards.length > 0) {
+      const allowedNames = new Set(allowedRewards.map((r) => r.name));
+      const filtered = rewards.filter((r) => allowedNames.has(r.name));
+      if (filtered.length > 0) return filtered;
+      return allowedRewards.map((r) => ({ id: r.id, name: r.name || String(r.id) }));
+    }
+    return rewards;
+  }, [allowedRewards, rewards]);
 
   useEffect(() => {
     const loadRewards = async () => {
@@ -43,9 +54,6 @@ export default function GenerateReferralPage() {
         const res = await apiFetch<Reward[]>(url);
         const rewardsData = Array.isArray(res) ? res : [];
         setRewards(rewardsData);
-        if (rewardsData.length > 0) {
-          setFormData((prev) => ({ ...prev, selectedReward: rewardsData[0].name }));
-        }
       } catch (err) {
         console.error("Failed to fetch rewards", err);
         const fallback = [
@@ -54,25 +62,35 @@ export default function GenerateReferralPage() {
           { id: 3, name: "Pest Treatment" },
         ];
         setRewards(fallback);
-        setFormData((prev) => ({ ...prev, selectedReward: fallback[0].name }));
       }
     };
     loadRewards();
   }, [tenantSlug]);
 
   useEffect(() => {
+    const first = rewardOptions[0]?.name || "";
+    setFormData((prev) => ({ ...prev, selectedReward: first }));
+  }, [rewardOptions]);
+
+  useEffect(() => {
     if (!token) return;
     const validateToken = async () => {
       setIsLoadingClientInfo(true);
       try {
-        const res = await apiFetch<{ name?: string; email?: string }>(
+        const res = await apiFetch<{ name?: string; email?: string; campaignId?: string | null; allowedRewards?: AllowedReward[] }>(
           `/api/users/validate-client-token?token=${encodeURIComponent(token)}`
         );
-        const { name, email } = res || {};
+        const { name, email, campaignId, allowedRewards: ar } = res || {};
+        if (ar && Array.isArray(ar)) {
+          setAllowedRewards(ar);
+        } else {
+          setAllowedRewards(null);
+        }
         setFormData((prev) => ({
           ...prev,
           name: name || prev.name,
           email: email || prev.email,
+          campaignId: campaignId || null,
         }));
       } catch (err: unknown) {
         console.error("Failed to validate token:", err);
@@ -193,23 +211,6 @@ export default function GenerateReferralPage() {
 
                 <div className="pt-2 space-y-4">
                   <div className="space-y-1">
-                    <Label>Prospect Name (optional)</Label>
-                    <Input
-                      value={formData.prospectName}
-                      onChange={(e) => handleChange("prospectName", e.target.value)}
-                      placeholder="Friend's name"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Prospect Email (optional)</Label>
-                    <Input
-                      type="email"
-                      value={formData.prospectEmail}
-                      onChange={(e) => handleChange("prospectEmail", e.target.value)}
-                      placeholder="friend@example.com"
-                    />
-                  </div>
-                  <div className="space-y-1">
                     <Label>Reward</Label>
                     <Select
                       value={formData.selectedReward}
@@ -219,11 +220,11 @@ export default function GenerateReferralPage() {
                         <SelectValue placeholder="Select reward" />
                       </SelectTrigger>
                       <SelectContent>
-                        {rewards.map((reward) => (
-                          <SelectItem key={reward.id} value={reward.name}>
-                            {reward.name}
-                          </SelectItem>
-                        ))}
+                {rewardOptions.map((reward) => (
+                  <SelectItem key={reward.id} value={reward.name}>
+                    {reward.name}
+                  </SelectItem>
+                ))}
                       </SelectContent>
                     </Select>
                   </div>

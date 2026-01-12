@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoreVertical } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -24,6 +25,8 @@ type Client = {
   phone?: string;
   role: string;
 };
+
+type Campaign = { id: number; name: string };
 
 const PAGE_SIZE = 10;
 
@@ -40,6 +43,9 @@ export default function AdminClientsPage() {
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [query, setQuery] = useState("");
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("none");
 
   useEffect(() => {
     const load = async () => {
@@ -52,6 +58,14 @@ export default function AdminClientsPage() {
           },
         });
         setClients(Array.isArray(res) ? res : []);
+
+        const campRes = await apiFetch<Campaign[]>("/api/campaigns", {
+          onUnauthorized: () => {
+            logout();
+            router.replace("/admin/login");
+          },
+        });
+        setCampaigns(Array.isArray(campRes) ? campRes : []);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to load clients";
         toast.error(message);
@@ -66,7 +80,13 @@ export default function AdminClientsPage() {
     setSelected((prev) => ({ ...prev, [id]: checked === "indeterminate" ? false : Boolean(checked) }));
   };
 
-  const totalPages = Math.max(1, Math.ceil(clients.length / PAGE_SIZE));
+  const filtered = clients.filter((c) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const handlePageChange = (delta: number) => {
     setPage((p) => {
       const next = p + delta;
@@ -78,7 +98,8 @@ export default function AdminClientsPage() {
 
   const handleGenerateLink = async (clientId: number) => {
     try {
-      const res = await apiFetch<{ link: string }>(`/api/users/${clientId}/generate-referral-link`, {
+      const query = selectedCampaignId && selectedCampaignId !== "none" ? `?campaignId=${selectedCampaignId}` : "";
+      const res = await apiFetch<{ link: string }>(`/api/users/${clientId}/generate-referral-link${query}`, {
         onUnauthorized: () => {
           logout();
           router.replace("/admin/login");
@@ -152,7 +173,7 @@ export default function AdminClientsPage() {
         "/api/users/send-invitations",
         {
           method: "POST",
-          body: { clientIds: ids },
+          body: { clientIds: ids, campaignId: selectedCampaignId !== "none" ? selectedCampaignId : undefined },
           onUnauthorized: () => {
             logout();
             router.replace("/admin/login");
@@ -189,6 +210,33 @@ export default function AdminClientsPage() {
           </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <Input
+              placeholder="Search by name or email"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+              className="max-w-sm"
+            />
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-slate-700">Campaign</Label>
+              <Select value={selectedCampaignId} onValueChange={(v) => setSelectedCampaignId(v)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {campaigns.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -201,7 +249,7 @@ export default function AdminClientsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((client) => (
+              {filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((client) => (
                 <TableRow key={client.id}>
                   <TableCell>
                     <Checkbox
@@ -249,7 +297,7 @@ export default function AdminClientsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {clients.length === 0 ? (
+              {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-sm text-slate-600">
                     {loading ? "Loading clients..." : "No clients found."}

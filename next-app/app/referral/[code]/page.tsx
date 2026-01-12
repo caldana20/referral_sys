@@ -28,6 +28,7 @@ type ReferralResponse = {
   used?: boolean;
   fieldConfig?: FieldConfig[];
   tenant?: { name?: string; logoUrl?: string | null };
+  newCode?: string;
 };
 
 export default function ReferralLandingHostPage() {
@@ -50,6 +51,7 @@ export default function ReferralLandingHostPage() {
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     const checkCode = async () => {
@@ -71,7 +73,15 @@ export default function ReferralLandingHostPage() {
             return next;
           });
         }
-        if (res.used) setUsed(true);
+        if (res.used) {
+          if (res.newCode) {
+            // Redirect prospect to the new referral code generated for them
+            setRedirecting(true);
+            window.location.replace(`/referral/${res.newCode}${tenantSlug ? `?tenant=${tenantSlug}` : ""}`);
+            return;
+          }
+          setUsed(true);
+        }
       } catch {
         setValid(false);
       } finally {
@@ -108,6 +118,7 @@ export default function ReferralLandingHostPage() {
 
   if (loading) return <div className="text-center p-10">Loading...</div>;
   if (valid === false) return <div className="text-center p-10 text-red-600 text-xl">Invalid or expired referral link.</div>;
+  if (redirecting) return <div className="text-center p-10">Preparing a fresh referral link…</div>;
 
   const renderField = (field: FieldConfig) => {
     const value = customFields[field.id] ?? "";

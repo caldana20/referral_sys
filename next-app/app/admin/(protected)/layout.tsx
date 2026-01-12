@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/layouts/admin-shell";
 import { useAuth, isAuthenticated } from "@/components/providers/auth-provider";
 
@@ -9,14 +9,16 @@ export default function AdminProtectedLayout({ children }: { children: React.Rea
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setHydrated(true);
     if (!isAuthenticated()) {
       router.replace("/admin/login");
     }
   }, [router, user]);
 
-  if (!isAuthenticated()) {
+  if (!hydrated || !isAuthenticated()) {
     return null;
   }
 

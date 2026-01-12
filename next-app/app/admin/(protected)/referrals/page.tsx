@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -22,6 +23,7 @@ type Referral = {
   prospectEmail?: string;
   User?: { name: string; email: string };
   Estimates?: Array<{ id: number; name?: string; email?: string; createdAt?: string }>;
+  Campaign?: { id: number; name: string };
 };
 
 export default function AdminReferralsPage() {
@@ -31,6 +33,7 @@ export default function AdminReferralsPage() {
   const [loading, setLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"All" | "Open" | "Closed">("All");
   const [selectedIds, setSelectedIds] = useState<Record<number, boolean>>({});
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,9 +58,22 @@ export default function AdminReferralsPage() {
   }, [load]);
 
   const filtered = useMemo(() => {
-    if (filterStatus === "All") return referrals;
-    return referrals.filter((r) => r.status === filterStatus);
-  }, [referrals, filterStatus]);
+    const byStatus = filterStatus === "All" ? referrals : referrals.filter((r) => r.status === filterStatus);
+    if (!query.trim()) return byStatus;
+    const q = query.toLowerCase();
+    return byStatus.filter((r) => {
+      const clientName = r.User?.name?.toLowerCase() || "";
+      const clientEmail = r.User?.email?.toLowerCase() || "";
+      const prospectName = r.Estimates?.[0]?.name?.toLowerCase() || r.prospectName?.toLowerCase() || "";
+      const prospectEmail = r.Estimates?.[0]?.email?.toLowerCase() || r.prospectEmail?.toLowerCase() || "";
+      return (
+        clientName.includes(q) ||
+        clientEmail.includes(q) ||
+        prospectName.includes(q) ||
+        prospectEmail.includes(q)
+      );
+    });
+  }, [referrals, filterStatus, query]);
 
   const toggleSelect = (id: number, checked: boolean | "indeterminate") => {
     setSelectedIds((prev) => ({ ...prev, [id]: checked === "indeterminate" ? false : Boolean(checked) }));
@@ -125,6 +141,12 @@ export default function AdminReferralsPage() {
           <CardDescription>View referral links and associated estimates.</CardDescription>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Input
+            placeholder="Search by client/prospect name or email"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-[260px]"
+          />
           <Select value={filterStatus} onValueChange={(v: "All" | "Open" | "Closed") => setFilterStatus(v)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Status" />
@@ -152,9 +174,9 @@ export default function AdminReferralsPage() {
               </TableHead>
               <TableHead>Code</TableHead>
               <TableHead>Client</TableHead>
+              <TableHead>Campaign</TableHead>
               <TableHead>Prospect</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Estimates</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="w-[120px]">Actions</TableHead>
             </TableRow>
@@ -172,6 +194,9 @@ export default function AdminReferralsPage() {
                 <TableCell>
                   <div className="text-sm font-medium">{referral.User?.name || "—"}</div>
                   <div className="text-xs text-slate-600">{referral.User?.email}</div>
+                </TableCell>
+                <TableCell className="text-sm text-slate-700">
+                  {referral.Campaign?.name || "—"}
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">
@@ -193,14 +218,6 @@ export default function AdminReferralsPage() {
                 </TableCell>
                 <TableCell>
                   <Badge variant={referral.status === "Closed" ? "outline" : "secondary"}>{referral.status}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm">{referral.Estimates?.length || 0}</div>
-                  {referral.Estimates?.[0]?.createdAt ? (
-                    <div className="text-[11px] text-slate-500">
-                      {new Date(referral.Estimates[0].createdAt).toLocaleString()}
-                    </div>
-                  ) : null}
                 </TableCell>
                 <TableCell className="text-xs text-slate-600">
                   {new Date(referral.createdAt).toLocaleString()}
