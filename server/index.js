@@ -8,10 +8,13 @@ const estimateRoutes = require('./routes/estimateRoutes');
 const userRoutes = require('./routes/userRoutes');
 const rewardRoutes = require('./routes/rewardRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
+const mediaRoutes = require('./routes/mediaRoutes');
 const senderRoutes = require('./routes/senderRoutes');
 const metaRoutes = require('./routes/metaRoutes');
 const metricsRoutes = require('./routes/metricsRoutes');
 const billingRoutes = require('./routes/billingRoutes');
+const productRoutes = require('./routes/productRoutes');
+const campaignRoutes = require('./routes/campaignRoutes');
 const billingController = require('./controllers/billingController');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
@@ -97,6 +100,9 @@ app.use('/api/senders', senderRoutes);
 app.use('/api/meta', metaRoutes);
 app.use('/api/metrics', metricsRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/campaigns', campaignRoutes);
+app.use('/api/media', mediaRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

@@ -74,6 +74,12 @@ Frontend/compose env (project `.env` and `next-app/.env.local`):
 - `NEXT_PUBLIC_API_BASE_URL=https://*.tenant.refoza.com/api`
 - `NEXT_PUBLIC_SITE_HOST=default.tenant.refoza.com` (or your wildcard/apex host for SSR)
 
+Local S3 for dev (MinIO example):
+- Run: `docker run -p 9000:9000 -p 9001:9001 -e MINIO_ROOT_USER=minio -e MINIO_ROOT_PASSWORD=minio123 -v $PWD/data/minio:/data quay.io/minio/minio server /data --console-address :9001`
+- Create bucket `tenant-media` (via MinIO console on :9001).
+- Set envs: `S3_ENDPOINT=http://localhost:9000`, `S3_REGION=us-east-1`, `S3_BUCKET_MEDIA=tenant-media`, `S3_ACCESS_KEY=minio`, `S3_SECRET_KEY=minio123`, `S3_FORCE_PATH_STYLE=true`, `S3_SIGNED_URL_EXPIRY=3600`.
+- Optional CORS (allow localhost): with `mc` CLI: `mc alias set minio http://localhost:9000 minio minio123` then `mc admin config set minio api cors_allow_origin='http://localhost:3000,http://localhost:5173'` and restart.
+
 ## 7) Build and run
 ```bash
 docker compose build

@@ -185,7 +185,7 @@ exports.importClients = async (req, res) => {
 
 // Send invitation emails to selected clients
 exports.sendInvitations = async (req, res) => {
-  const { clientIds } = req.body;
+  const { clientIds, campaignId } = req.body;
 
   if (!clientIds || !Array.isArray(clientIds) || clientIds.length === 0) {
     return res.status(400).json({ message: 'No client IDs provided' });
@@ -215,6 +215,13 @@ exports.sendInvitations = async (req, res) => {
     }
 
     const companyName = tenant.name || 'Your Company';
+    // Validate campaign for tenant if provided
+    let campaignName = null;
+    if (campaignId) {
+      const campaign = await require('../models').Campaign.findOne({ where: { id: campaignId, tenantId } });
+      if (!campaign) return res.status(400).json({ message: 'Invalid campaignId' });
+      campaignName = campaign.name || null;
+    }
     const tenantSender = await require('./senderController').resolveTenantSender(tenantId);
     const fromEmail = tenantSender?.fromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
     const fromName = tenantSender?.fromName || companyName;
@@ -237,6 +244,7 @@ exports.sendInvitations = async (req, res) => {
             clientName: client.name,
             tenantId,
             tenantSlug: tenant.slug,
+            campaignId: campaignId || null,
             type: 'client_referral_link'
           },
           process.env.JWT_SECRET || 'secret_key',
@@ -257,6 +265,11 @@ exports.sendInvitations = async (req, res) => {
               <p style="color: #374151; font-size: 16px;">
                 Start earning rewards today with our referral program.
               </p>
+              ${
+                campaignName
+                  ? `<p style="color: #1e3a8a; font-size: 14px; margin-top: 8px;"><strong>Campaign:</strong> ${campaignName}</p>`
+                  : ""
+              }
             </div>
 
             <div style="color: #4b5563; font-size: 15px; line-height: 1.6;">
@@ -326,6 +339,28 @@ async function getPrimaryHost(tenantId) {
   return host ? host.host : null;
 }
 
+function replaceWildcardHost(raw, tenantSlug) {
+  if (!raw) return raw;
+  let clean = raw;
+  try {
+    clean = decodeURIComponent(clean);
+  } catch (_) {
+    // ignore decode errors, use original
+  }
+  clean = clean.replace(/%2A/gi, '*');
+  // Replace any wildcard sequences with the tenant slug
+  clean = clean
+    .replace(/^\*+\./, `${tenantSlug}.`)
+    .replace(/\.\*+\./g, `.${tenantSlug}.`)
+    .replace(/\.\*+$/g, `.${tenantSlug}`)
+    .replace(/\*+/g, tenantSlug)
+    .replace(/^\.\./, '.')
+    .replace(/\/+$/, '');
+  // If slug is already present twice (e.g., default.default.host), collapse duplicates at start
+  clean = clean.replace(new RegExp(`^(${tenantSlug}\\.)+`), `${tenantSlug}.`);
+  return clean;
+}
+
 async function buildTenantBaseUrl(tenantId) {
   const tenant = await Tenant.findByPk(tenantId);
   if (!tenant || !tenant.slug) {
@@ -336,7 +371,9 @@ async function buildTenantBaseUrl(tenantId) {
   const primaryHost = await getPrimaryHost(tenantId);
   if (primaryHost) {
     const protocol = process.env.CLIENT_PROTOCOL || (primaryHost.startsWith('http') ? '' : 'https');
-    let clean = primaryHost.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    let clean = replaceWildcardHost(primaryHost, tenantSlug)
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
     if (clean.includes('localhost') && !clean.includes(':')) {
       clean = `${clean}:${process.env.CLIENT_PORT || '3000'}`;
     }
@@ -345,14 +382,9 @@ async function buildTenantBaseUrl(tenantId) {
 
   let base = process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'localhost:3000';
   const protocol = process.env.CLIENT_PROTOCOL || (base.startsWith('http') ? '' : 'https');
-  let clean = base.replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-  if (clean.includes('*')) {
-    clean = clean
-      .replace('*.', `${tenantSlug}.`)
-      .replace('*', tenantSlug)
-      .replace(/^\.\./, '.');
-  }
+  let clean = replaceWildcardHost(base, tenantSlug)
+    .replace(/^https?:\/\//, '')
+    .replace(/\/$/, '');
 
   if (clean.includes('localhost') && !clean.includes(':')) {
     clean = `${clean}:${process.env.CLIENT_PORT || '3000'}`;
@@ -363,6 +395,7 @@ async function buildTenantBaseUrl(tenantId) {
 
 exports.generateClientReferralLink = async (req, res) => {
   const { clientId } = req.params;
+  const { campaignId } = req.query;
 
   try {
     const client = await User.findByPk(clientId);
@@ -379,6 +412,13 @@ exports.generateClientReferralLink = async (req, res) => {
       return res.status(404).json({ message: 'Tenant not found' });
     }
 
+    // Validate campaign if provided
+    let campaign = null;
+    if (campaignId) {
+      campaign = await require('../models').Campaign.findOne({ where: { id: campaignId, tenantId: tenant.id } });
+      if (!campaign) return res.status(400).json({ message: 'Invalid campaignId' });
+    }
+
     // Generate a JWT token that expires in 30 days
     const token = jwt.sign(
       { 
@@ -387,6 +427,7 @@ exports.generateClientReferralLink = async (req, res) => {
         clientName: client.name,
         tenantId: tenant.id,
         tenantSlug: tenant.slug,
+        campaignId: campaign ? campaign.id : null,
         type: 'client_referral_link'
       },
       process.env.JWT_SECRET || 'secret_key',
@@ -433,10 +474,31 @@ exports.validateClientToken = async (req, res) => {
       return res.status(404).json({ message: 'Client not found' });
     }
 
+    let allowedRewards = null;
+    if (decoded.campaignId) {
+      const campaign = await require('../models').Campaign.findOne({
+        where: { id: decoded.campaignId, tenantId: decoded.tenantId },
+        include: [
+          {
+            model: require('../models').CampaignReward,
+            include: [{ model: require('../models').RewardSetting, attributes: ['id', 'name'] }]
+          }
+        ]
+      });
+      if (campaign) {
+        allowedRewards = (campaign.CampaignRewards || []).map((cr) => ({
+          id: cr.rewardSettingId,
+          name: cr.RewardSetting?.name || ''
+        }));
+      }
+    }
+
     res.json({
       name: client.name,
       email: client.email,
-      clientId: client.id
+      clientId: client.id,
+      campaignId: decoded.campaignId || null,
+      allowedRewards
     });
   } catch (error) {
     if (error.name === 'TokenExpiredError') {

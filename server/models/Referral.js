@@ -39,6 +39,10 @@ const Referral = sequelize.define('Referral', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  campaignId: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
   selectedReward: {
     type: DataTypes.STRING, // Changed from ENUM to support dynamic rewards
     allowNull: false

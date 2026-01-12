@@ -23,6 +23,10 @@ const Estimate = sequelize.define('Estimate', {
       key: 'id'
     }
   },
+  campaignId: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
   name: {
     type: DataTypes.STRING,
     allowNull: false

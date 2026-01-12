@@ -1,4 +1,4 @@
-const { Tenant, User, RewardSetting, TenantHost, sequelize } = require('../models');
+const { Tenant, User, RewardSetting, TenantHost, Media, sequelize } = require('../models');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
@@ -149,11 +149,27 @@ exports.getSettings = async (req, res) => {
     const tenant = await Tenant.findByPk(req.user.tenantId);
     if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
 
+    console.info('getSettings returning:', {
+      tenantId: tenant.id,
+      name: tenant.name,
+      address: tenant.address,
+      city: tenant.city,
+      state: tenant.state,
+      zip: tenant.zip,
+      country: tenant.country
+    });
+
     res.json({
       id: tenant.id,
       name: tenant.name,
       slug: tenant.slug,
       logoUrl: tenant.logoUrl,
+      logoMediaId: tenant.logoMediaId,
+      address: tenant.address,
+      city: tenant.city,
+      state: tenant.state,
+      zip: tenant.zip,
+      country: tenant.country,
       sendgridFromEmail: tenant.sendgridFromEmail,
       stripeCustomerId: tenant.stripeCustomerId,
       stripeSubscriptionId: tenant.stripeSubscriptionId,
@@ -175,7 +191,17 @@ exports.updateSettings = async (req, res) => {
     const tenant = await Tenant.findByPk(req.user.tenantId);
     if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
 
-    const { name } = req.body;
+    const { name, address, city, state, zip, country, logoMediaId } = req.body;
+    console.info('updateSettings payload:', {
+      tenantId: req.user.tenantId,
+      name,
+      address,
+      city,
+      state,
+      zip,
+      country,
+      logoMediaId
+    });
     if (name && name.trim() === '') {
       return res.status(400).json({ message: 'Name cannot be empty' });
     }
@@ -184,19 +210,70 @@ exports.updateSettings = async (req, res) => {
       tenant.name = name.trim();
     }
 
+    const normalize = (val) => {
+      if (val === undefined) return undefined;
+      const trimmed = (val || '').trim();
+      return trimmed || null;
+    };
+
+    const nextAddress = normalize(address);
+    const nextCity = normalize(city);
+    const nextState = normalize(state);
+    const nextZip = normalize(zip);
+    const nextCountry = normalize(country);
+
+    if (nextAddress !== undefined) tenant.address = nextAddress;
+    if (nextCity !== undefined) tenant.city = nextCity;
+    if (nextState !== undefined) tenant.state = nextState;
+    if (nextZip !== undefined) tenant.zip = nextZip;
+    if (nextCountry !== undefined) tenant.country = nextCountry;
+
+    if (logoMediaId !== undefined) {
+      if (logoMediaId === null || logoMediaId === '') {
+        tenant.logoMediaId = null;
+        if (!req.file) {
+          tenant.logoUrl = null;
+        }
+      } else {
+        const mediaId = Number(logoMediaId);
+        if (!Number.isFinite(mediaId)) {
+          return res.status(400).json({ message: 'logoMediaId must be a number' });
+        }
+        const media = await Media.findOne({ where: { id: mediaId, tenantId: req.user.tenantId } });
+        if (!media) return res.status(400).json({ message: 'Logo image not found for tenant' });
+        tenant.logoMediaId = media.id;
+        tenant.logoUrl = media.url;
+      }
+    }
+
     if (req.file) {
       const filePath = req.file.path.replace(/\\/g, '/');
       const publicUrl = `${req.protocol}://${req.get('host')}/${filePath}`;
       tenant.logoUrl = publicUrl;
+      tenant.logoMediaId = null;
     }
 
     await tenant.save();
+    console.info('updateSettings saved:', {
+      tenantId: tenant.id,
+      address: tenant.address,
+      city: tenant.city,
+      state: tenant.state,
+      zip: tenant.zip,
+      country: tenant.country
+    });
 
     res.json({
       id: tenant.id,
       name: tenant.name,
       slug: tenant.slug,
       logoUrl: tenant.logoUrl,
+      logoMediaId: tenant.logoMediaId,
+      address: tenant.address,
+      city: tenant.city,
+      state: tenant.state,
+      zip: tenant.zip,
+      country: tenant.country,
       sendgridFromEmail: tenant.sendgridFromEmail,
       stripeCustomerId: tenant.stripeCustomerId,
       stripeSubscriptionId: tenant.stripeSubscriptionId,

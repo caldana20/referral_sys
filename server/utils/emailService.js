@@ -42,6 +42,8 @@ exports.sendEmail = async ({ to, subject, html, fromEmail, fromName }) => {
       html: html
     };
 
+    console.info('SendGrid mail payload:', msg);
+
     const result = await sgMail.send(msg);
     
     // Log success
