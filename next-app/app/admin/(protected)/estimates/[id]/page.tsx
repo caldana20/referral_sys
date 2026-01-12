@@ -18,6 +18,12 @@ type Estimate = {
   description?: string;
   customFields?: Record<string, unknown>;
   createdAt?: string;
+  Referral?: {
+    code: string;
+    User?: { name: string; email: string };
+    Campaign?: { id: number; name: string };
+  };
+  Campaign?: { id: number; name: string };
 };
 
 export default function EstimateDetailPage() {
@@ -118,6 +124,18 @@ export default function EstimateDetailPage() {
             </div>
 
             {renderCustomFields()}
+
+            {estimate.Referral ? (
+              <div className="space-y-1">
+                <div className="text-xs uppercase text-slate-500">Referral Code</div>
+                <div className="text-sm text-slate-800">{estimate.Referral.code}</div>
+                {estimate.Referral.Campaign ? (
+                  <div className="text-sm text-slate-700">Campaign: {estimate.Referral.Campaign.name}</div>
+                ) : estimate.Campaign ? (
+                  <div className="text-sm text-slate-700">Campaign: {estimate.Campaign.name}</div>
+                ) : null}
+              </div>
+            ) : null}
 
             {estimate.id ? (
               <div className="flex items-center gap-2 text-xs text-slate-600">

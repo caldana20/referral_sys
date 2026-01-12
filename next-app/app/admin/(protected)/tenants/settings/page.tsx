@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
 import { toast } from "sonner";
@@ -15,7 +17,15 @@ type TenantSettings = {
   name: string;
   slug: string;
   logoUrl?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  country?: string | null;
 };
+
+type Country = { code: string; name: string };
+type StateType = { code: string; name: string };
 
 type SenderInfo = {
   exists: boolean;
@@ -27,20 +37,162 @@ type SenderInfo = {
   lastError?: string | null;
 };
 
+type MediaItem = {
+  id: number;
+  url: string;
+  signedUrl?: string | null;
+  filename?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  createdAt?: string;
+};
+
 export default function TenantSettingsPage() {
   const router = useRouter();
   const { logout } = useAuth();
   const [settings, setSettings] = useState<TenantSettings | null>(null);
   const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zip, setZip] = useState("");
+  const [country, setCountry] = useState("");
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [states, setStates] = useState<StateType[]>([]);
+  const [geoLoading, setGeoLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoMediaId, setLogoMediaId] = useState<number | null>(null);
+  const [logoClear, setLogoClear] = useState(false);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [mediaDialogOpen, setMediaDialogOpen] = useState(false);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaLoaded, setMediaLoaded] = useState(false);
   const [sender, setSender] = useState<SenderInfo | null>(null);
   const [senderLoading, setSenderLoading] = useState(false);
   const [fromName, setFromName] = useState("");
   const [fromEmail, setFromEmail] = useState("");
   const [testRecipient, setTestRecipient] = useState("");
   const [sendingTest, setSendingTest] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const applySenderState = (data: SenderInfo | null) => {
+    setSender(data);
+    if (data?.fromName) setFromName(data.fromName);
+    if (data?.fromEmail) setFromEmail(data.fromEmail);
+  };
+
+  const loadMedia = async () => {
+    setMediaLoading(true);
+    try {
+      const res = await apiFetch<MediaItem[]>("/api/media", {
+        onUnauthorized: () => {
+          logout();
+          router.replace("/admin/login");
+        },
+      });
+      setMediaItems(Array.isArray(res) ? res : []);
+      setMediaLoaded(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load media");
+    } finally {
+      setMediaLoading(false);
+    }
+  };
+
+  const openMediaDialog = () => {
+    setMediaDialogOpen(true);
+    if (!mediaLoaded) {
+      loadMedia();
+    }
+  };
+
+  const handleSelectLogoMedia = (item: MediaItem) => {
+    setLogoMediaId(item.id);
+    setLogoPreview(item.signedUrl || item.url || null);
+    setLogoClear(false);
+    setMediaDialogOpen(false);
+  };
+
+  const handleClearLogo = () => {
+    setLogoMediaId(null);
+    setLogoPreview(null);
+    setLogoClear(true);
+  };
+
+  useEffect(() => {
+    const loadCountries = async () => {
+      setGeoLoading(true);
+      try {
+        const res = await apiFetch<Country[]>("/api/meta/countries", {
+          onUnauthorized: () => {
+            logout();
+            router.replace("/admin/login");
+          },
+        });
+        setCountries(Array.isArray(res) ? res : []);
+      } catch (err) {
+        console.error("Failed to load countries", err);
+      } finally {
+        setGeoLoading(false);
+      }
+    };
+    loadCountries();
+  }, [logout, router]);
+
+  // If the stored country is a name (not a code), normalize it to a code once countries load
+  useEffect(() => {
+    if (!country || countries.length === 0) return;
+    const found = countries.find(
+      (c) => c.code.toLowerCase() === country.toLowerCase() || c.name.toLowerCase() === country.toLowerCase()
+    );
+    if (found && found.code !== country) {
+      setCountry(found.code);
+    }
+  }, [countries, country]);
+
+  useEffect(() => {
+    const loadStates = async () => {
+      if (!country) {
+        setStates([]);
+        return;
+      }
+      setGeoLoading(true);
+      try {
+        const res = await apiFetch<StateType[]>(`/api/meta/countries/${country}/states`, {
+          onUnauthorized: () => {
+            logout();
+            router.replace("/admin/login");
+          },
+        });
+        const list = Array.isArray(res) ? res : [];
+        setStates(list);
+        setState((prev) => {
+          if (!prev) return "";
+          const matchCode = list.find((st) => st.code.toLowerCase() === prev.toLowerCase());
+          if (matchCode) return matchCode.code;
+          const matchName = list.find((st) => st.name.toLowerCase() === prev.toLowerCase());
+          if (matchName) return matchName.code;
+          return "";
+        });
+      } catch (err) {
+        console.error("Failed to load states", err);
+        setStates([]);
+      } finally {
+        setGeoLoading(false);
+      }
+    };
+    loadStates();
+  }, [country, logout, router]);
+
+  // Normalize state/province if stored value is a name instead of a code
+  useEffect(() => {
+    if (!state || states.length === 0) return;
+    const matchByCode = states.some((st) => st.code.toLowerCase() === state.toLowerCase());
+    if (matchByCode) return;
+    const found = states.find((st) => st.name.toLowerCase() === state.toLowerCase());
+    if (found) setState(found.code);
+  }, [state, states]);
 
   useEffect(() => {
     const load = async () => {
@@ -54,15 +206,19 @@ export default function TenantSettingsPage() {
         });
         setSettings(res);
         setName(res?.name || "");
+        setAddress(res?.address || "");
+        setCity(res?.city || "");
+        setState(res?.state || "");
+        setZip(res?.zip || "");
+        setCountry(res?.country || "");
+        setLogoMediaId(res?.logoMediaId ?? null);
         const senderRes = await apiFetch<SenderInfo>("/api/senders", {
           onUnauthorized: () => {
             logout();
             router.replace("/admin/login");
           },
         });
-        setSender(senderRes);
-        if (senderRes?.fromName) setFromName(senderRes.fromName);
-        if (senderRes?.fromEmail) setFromEmail(senderRes.fromEmail);
+        applySenderState(senderRes);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to load settings";
         toast.error(message);
@@ -78,7 +234,16 @@ export default function TenantSettingsPage() {
 
     const formData = new FormData();
     if (name.trim()) formData.append("name", name.trim());
-    if (logoFile) formData.append("logo", logoFile);
+    if (address.trim()) formData.append("address", address.trim());
+    if (city.trim()) formData.append("city", city.trim());
+    if (state.trim()) formData.append("state", state.trim());
+    if (zip.trim()) formData.append("zip", zip.trim());
+    if (country.trim()) formData.append("country", country.trim());
+    if (logoMediaId !== null) {
+      formData.append("logoMediaId", String(logoMediaId));
+    } else if (logoClear) {
+      formData.append("logoMediaId", "");
+    }
 
     setSaving(true);
     try {
@@ -91,8 +256,14 @@ export default function TenantSettingsPage() {
         },
       });
       setSettings(res);
-      if (logoFile && logoPreview) setLogoPreview(null);
-      setLogoFile(null);
+      setAddress(res?.address || "");
+      setCity(res?.city || "");
+      setState(res?.state || "");
+      setZip(res?.zip || "");
+      setCountry(res?.country || "");
+      setLogoMediaId(res?.logoMediaId ?? null);
+      setLogoPreview(null);
+      setLogoClear(false);
       toast.success("Settings updated");
     } catch (err: unknown) {
       const status = (err as { status?: number }).status;
@@ -127,7 +298,7 @@ export default function TenantSettingsPage() {
           router.replace("/admin/login");
         },
       });
-      setSender(res);
+      applySenderState(res);
       toast.success("Verification email sent. Please check the inbox and click the SendGrid link.");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create sender";
@@ -146,7 +317,7 @@ export default function TenantSettingsPage() {
           router.replace("/admin/login");
         },
       });
-      setSender(res);
+      applySenderState(res);
       toast.success("Sender status refreshed");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to refresh sender";
@@ -181,6 +352,31 @@ export default function TenantSettingsPage() {
     }
   };
 
+  const handleResetSender = async () => {
+    setResetting(true);
+    try {
+      await apiFetch("/api/senders", {
+        method: "DELETE",
+        onUnauthorized: () => {
+          logout();
+          router.replace("/admin/login");
+        },
+      });
+      applySenderState(null);
+      setFromName("");
+      setFromEmail("");
+      toast.success("Sender reset. Configure a new sender.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to reset sender";
+      toast.error(message);
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const selectedLogoMedia = logoMediaId ? mediaItems.find((m) => m.id === logoMediaId) : null;
+  const logoDisplay = logoPreview || selectedLogoMedia?.signedUrl || selectedLogoMedia?.url || settings?.logoUrl || null;
+
   return (
     <div className="space-y-6">
       <Card>
@@ -197,27 +393,92 @@ export default function TenantSettingsPage() {
             <Label>Slug</Label>
             <Input value={settings?.slug || ""} disabled />
           </div>
-          {settings?.logoUrl ? (
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="space-y-1 md:col-span-2">
+              <Label>Address</Label>
+              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St" />
+            </div>
+            <div className="space-y-1">
+              <Label>City</Label>
+              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
+            </div>
+            <div className="space-y-1">
+              <Label>ZIP/Postal Code</Label>
+              <Input value={zip} onChange={(e) => setZip(e.target.value)} placeholder="Postal code" />
+            </div>
+            <div className="space-y-1">
+              <Label>Country</Label>
+              <Select
+                value={country}
+                onValueChange={(val) => {
+                  setCountry(val);
+                }}
+                disabled={geoLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  {countries.map((ct) => (
+                    <SelectItem key={ct.code} value={ct.code}>
+                      {ct.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>State/Province</Label>
+              {states.length > 0 ? (
+                <Select
+                  value={state}
+                  onValueChange={(val) => {
+                    setState(val);
+                  }}
+                  disabled={geoLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {states.map((st) => (
+                      <SelectItem key={st.code} value={st.code}>
+                        {st.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  placeholder="State / Province"
+                  disabled={geoLoading}
+                />
+              )}
+            </div>
+          </div>
+          {logoDisplay ? (
             <div className="space-y-1">
               <Label>Logo</Label>
               <img
-                src={logoPreview || settings.logoUrl}
+                src={logoDisplay}
                 alt="Tenant logo"
                 className="h-12 w-12 rounded border object-contain"
               />
             </div>
-          ) : null}
-          <div className="space-y-1">
-            <Label>Upload New Logo</Label>
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0] || null;
-                setLogoFile(file);
-                setLogoPreview(file ? URL.createObjectURL(file) : null);
-              }}
-            />
+          ) : (
+            <p className="text-sm text-slate-500">No logo selected.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={openMediaDialog}>
+              Choose from media
+            </Button>
+            {(settings?.logoUrl || logoMediaId || logoPreview) && (
+              <Button type="button" variant="ghost" onClick={handleClearLogo}>
+                Remove logo
+              </Button>
+            )}
           </div>
           <Button onClick={handleSave} disabled={saving || !name.trim()}>
             {saving ? "Saving..." : "Save"}
@@ -246,14 +507,22 @@ export default function TenantSettingsPage() {
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <Button onClick={handleCreateSender} disabled={senderLoading}>
-              {senderLoading ? "Working..." : sender?.exists ? "Resend Verification" : "Create Sender"}
-            </Button>
-            <Button variant="outline" onClick={handleRefreshSender} disabled={senderLoading}>
-              Refresh Status
-            </Button>
-          </div>
+          {!sender?.verified ? (
+            <div className="flex gap-2">
+              <Button onClick={handleCreateSender} disabled={senderLoading}>
+                {senderLoading ? "Working..." : sender?.exists ? "Resend Verification" : "Create Sender"}
+              </Button>
+              <Button variant="outline" onClick={handleRefreshSender} disabled={senderLoading}>
+                Refresh Status
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="destructive" onClick={handleResetSender} disabled={resetting}>
+                {resetting ? "Resetting..." : "Reset Sender"}
+              </Button>
+            </div>
+          )}
 
           {sender ? (
             <div className="space-y-1 text-sm">
@@ -279,6 +548,49 @@ export default function TenantSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Select logo image</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-between pb-2">
+            <div className="text-sm text-slate-600">Choose an image from the media gallery.</div>
+            <Button variant="outline" size="sm" onClick={loadMedia} disabled={mediaLoading}>
+              {mediaLoading ? "Loading..." : "Refresh"}
+            </Button>
+          </div>
+          {mediaLoading ? (
+            <div className="text-sm text-slate-600">Loading...</div>
+          ) : mediaItems.length === 0 ? (
+            <div className="text-sm text-slate-600">No media found. Upload images first.</div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+              {mediaItems.map((item) => {
+                const preview = item.signedUrl || item.url;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleSelectLogoMedia(item)}
+                    className="group rounded border bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow"
+                  >
+                    <div className="aspect-square w-full overflow-hidden border-b bg-slate-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={preview} alt={item.filename || "media"} className="h-full w-full object-cover" />
+                    </div>
+                    <div className="p-2 text-xs text-slate-700">
+                      <div className="truncate font-medium" title={item.filename || ""}>
+                        {item.filename || "Untitled"}
+                      </div>
+                      <div className="text-slate-500">{item.contentType || ""}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

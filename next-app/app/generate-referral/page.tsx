@@ -13,6 +13,7 @@ import { apiFetch } from "@/lib/api-client";
 import { useTenant } from "@/components/providers/tenant-provider";
 
 type Reward = { id: number; name: string; active?: boolean };
+type AllowedReward = { id: number; name: string };
 
 function GenerateReferralHostContent() {
   const searchParams = useSearchParams();
@@ -20,12 +21,12 @@ function GenerateReferralHostContent() {
 
   const [step, setStep] = useState(1);
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [allowedRewards, setAllowedRewards] = useState<AllowedReward[] | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    prospectName: "",
-    prospectEmail: "",
     selectedReward: "",
+    campaignId: null as string | null,
   });
   const [generatedLink, setGeneratedLink] = useState("");
   const [error, setError] = useState("");
@@ -33,15 +34,22 @@ function GenerateReferralHostContent() {
   const tenantSlug = useMemo(() => ctxTenant || searchParams.get("tenant") || "", [ctxTenant, searchParams]);
   const token = searchParams.get("token");
 
+  const rewardOptions = useMemo(() => {
+    if (allowedRewards && allowedRewards.length > 0) {
+      const allowedNames = new Set(allowedRewards.map((r) => r.name));
+      const filtered = rewards.filter((r) => allowedNames.has(r.name));
+      if (filtered.length > 0) return filtered;
+      return allowedRewards.map((r) => ({ id: r.id, name: r.name || String(r.id) }));
+    }
+    return rewards;
+  }, [allowedRewards, rewards]);
+
   useEffect(() => {
     const loadRewards = async () => {
       try {
         const res = await apiFetch<Reward[]>("/api/rewards/active");
         const rewardsData = Array.isArray(res) ? res : [];
         setRewards(rewardsData);
-        if (rewardsData.length > 0) {
-          setFormData((prev) => ({ ...prev, selectedReward: rewardsData[0].name }));
-        }
       } catch (err) {
         console.error("Failed to fetch rewards", err);
         const fallback = [
@@ -50,24 +58,34 @@ function GenerateReferralHostContent() {
           { id: 3, name: "Pest Treatment" },
         ];
         setRewards(fallback);
-        setFormData((prev) => ({ ...prev, selectedReward: fallback[0].name }));
       }
     };
     loadRewards();
   }, []);
 
   useEffect(() => {
+    const first = rewardOptions[0]?.name || "";
+    setFormData((prev) => ({ ...prev, selectedReward: first }));
+  }, [rewardOptions]);
+
+  useEffect(() => {
     if (!token) return;
     const validateToken = async () => {
       try {
-        const res = await apiFetch<{ name?: string; email?: string }>(
+        const res = await apiFetch<{ name?: string; email?: string; campaignId?: string | null; allowedRewards?: AllowedReward[] }>(
           `/api/users/validate-client-token?token=${encodeURIComponent(token)}`
         );
-        const { name, email } = res || {};
+        const { name, email, campaignId, allowedRewards: ar } = res || {};
+        if (ar && Array.isArray(ar)) {
+          setAllowedRewards(ar);
+        } else {
+          setAllowedRewards(null);
+        }
         setFormData((prev) => ({
           ...prev,
           name: name || prev.name,
           email: email || prev.email,
+          campaignId: campaignId || null,
         }));
       } catch (err: unknown) {
         console.error("Failed to validate token:", err);
@@ -147,28 +165,6 @@ function GenerateReferralHostContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label htmlFor="prospectName">Prospect Name</Label>
-                  <Input
-                    id="prospectName"
-                    value={formData.prospectName}
-                    onChange={(e) => handleChange("prospectName", e.target.value)}
-                    placeholder="Optional"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="prospectEmail">Prospect Email</Label>
-                  <Input
-                    id="prospectEmail"
-                    type="email"
-                    value={formData.prospectEmail}
-                    onChange={(e) => handleChange("prospectEmail", e.target.value)}
-                    placeholder="Optional"
-                  />
-                </div>
-              </div>
-
               <div className="space-y-1">
                 <Label>Reward</Label>
                 <Select
@@ -179,11 +175,11 @@ function GenerateReferralHostContent() {
                     <SelectValue placeholder="Select reward" />
                   </SelectTrigger>
                   <SelectContent>
-                    {rewards.map((reward) => (
-                      <SelectItem key={reward.id} value={reward.name}>
-                        {reward.name}
-                      </SelectItem>
-                    ))}
+                {rewardOptions.map((reward) => (
+                  <SelectItem key={reward.id} value={reward.name}>
+                    {reward.name}
+                  </SelectItem>
+                ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -204,6 +200,13 @@ function GenerateReferralHostContent() {
                 </AlertDescription>
               </Alert>
               <Badge variant="outline">Reward: {formData.selectedReward}</Badge>
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => generatedLink && navigator.clipboard.writeText(generatedLink)}
+              >
+                Copy Link
+              </Button>
               <Button onClick={() => setStep(1)} variant="outline" className="w-full">
                 Generate Another
               </Button>
