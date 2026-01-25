@@ -185,11 +185,7 @@ exports.importClients = async (req, res) => {
 
 // Send invitation emails to selected clients
 exports.sendInvitations = async (req, res) => {
-  const { clientIds, campaignId } = req.body;
-
-  if (!clientIds || !Array.isArray(clientIds) || clientIds.length === 0) {
-    return res.status(400).json({ message: 'No client IDs provided' });
-  }
+  const { clientIds, campaignId, groupId } = req.body;
 
   try {
     const tenantId = req.user?.tenantId;
@@ -202,9 +198,25 @@ exports.sendInvitations = async (req, res) => {
       return res.status(404).json({ message: 'Tenant not found' });
     }
 
+    let resolvedClientIds = Array.isArray(clientIds) ? clientIds : [];
+    if ((!resolvedClientIds || resolvedClientIds.length === 0) && groupId) {
+      const Group = require('../models').Group;
+      const GroupMember = require('../models').GroupMember;
+      const groupIdNum = Number(groupId);
+      if (!Number.isFinite(groupIdNum)) return res.status(400).json({ message: 'Invalid groupId' });
+      const group = await Group.findOne({ where: { id: groupIdNum, tenantId } });
+      if (!group) return res.status(400).json({ message: 'Invalid groupId' });
+      const members = await GroupMember.findAll({ where: { groupId: group.id } });
+      resolvedClientIds = members.map((m) => m.userId);
+    }
+
+    if (!resolvedClientIds || resolvedClientIds.length === 0) {
+      return res.status(400).json({ message: 'No client IDs provided' });
+    }
+
     const clients = await User.findAll({
       where: {
-        id: clientIds,
+        id: resolvedClientIds,
         role: 'client',
         tenantId
       }

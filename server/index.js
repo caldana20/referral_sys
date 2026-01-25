@@ -9,6 +9,7 @@ const userRoutes = require('./routes/userRoutes');
 const rewardRoutes = require('./routes/rewardRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
+const groupRoutes = require('./routes/groupRoutes');
 const senderRoutes = require('./routes/senderRoutes');
 const metaRoutes = require('./routes/metaRoutes');
 const metricsRoutes = require('./routes/metricsRoutes');
@@ -103,6 +104,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/groups', groupRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

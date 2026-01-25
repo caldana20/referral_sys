@@ -212,6 +212,25 @@ export default function TenantSettingsPage() {
         setZip(res?.zip || "");
         setCountry(res?.country || "");
         setLogoMediaId(res?.logoMediaId ?? null);
+        if (res?.logoMediaId) {
+          try {
+            const mediaRes = await apiFetch<MediaItem[]>("/api/media", {
+              onUnauthorized: () => {
+                logout();
+                router.replace("/admin/login");
+              },
+            });
+            const list = Array.isArray(mediaRes) ? mediaRes : [];
+            setMediaItems(list);
+            setMediaLoaded(true);
+            const match = list.find((m) => m.id === res.logoMediaId);
+            if (match) {
+              setLogoPreview(match.signedUrl || match.url || null);
+            }
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to load logo media");
+          }
+        }
         const senderRes = await apiFetch<SenderInfo>("/api/senders", {
           onUnauthorized: () => {
             logout();

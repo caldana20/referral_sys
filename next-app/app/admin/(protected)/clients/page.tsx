@@ -27,6 +27,7 @@ type Client = {
 };
 
 type Campaign = { id: number; name: string };
+type Group = { id: number; name: string };
 
 const PAGE_SIZE = 10;
 
@@ -45,7 +46,14 @@ export default function AdminClientsPage() {
   const [editPhone, setEditPhone] = useState("");
   const [query, setQuery] = useState("");
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("none");
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteCampaignId, setInviteCampaignId] = useState<string>("none");
+  const [inviteIds, setInviteIds] = useState<number[]>([]);
+  const [inviteGroupId, setInviteGroupId] = useState<string>("none");
+  const [inviteMode, setInviteMode] = useState<"clients" | "group">("clients");
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [groupName, setGroupName] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -66,6 +74,14 @@ export default function AdminClientsPage() {
           },
         });
         setCampaigns(Array.isArray(campRes) ? campRes : []);
+
+        const groupRes = await apiFetch<Group[]>("/api/groups", {
+          onUnauthorized: () => {
+            logout();
+            router.replace("/admin/login");
+          },
+        });
+        setGroups(Array.isArray(groupRes) ? groupRes : []);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to load clients";
         toast.error(message);
@@ -98,8 +114,7 @@ export default function AdminClientsPage() {
 
   const handleGenerateLink = async (clientId: number) => {
     try {
-      const query = selectedCampaignId && selectedCampaignId !== "none" ? `?campaignId=${selectedCampaignId}` : "";
-      const res = await apiFetch<{ link: string }>(`/api/users/${clientId}/generate-referral-link${query}`, {
+      const res = await apiFetch<{ link: string }>(`/api/users/${clientId}/generate-referral-link`, {
         onUnauthorized: () => {
           logout();
           router.replace("/admin/login");
@@ -132,6 +147,93 @@ export default function AdminClientsPage() {
     }
   };
 
+  const openInviteDialog = () => {
+    const ids = Object.entries(selected)
+      .filter(([, val]) => val)
+      .map(([id]) => Number(id));
+    if (ids.length === 0) {
+      setInviteMode("group");
+      setInviteGroupId("none");
+    } else {
+      setInviteMode("clients");
+      setInviteIds(ids);
+    }
+    setInviteCampaignId("none");
+    setInviteDialogOpen(true);
+  };
+
+  const handleSendInvitations = async () => {
+    if (inviteMode === "clients" && inviteIds.length === 0) {
+      toast.message("Select at least one client");
+      return;
+    }
+    if (inviteMode === "group" && inviteGroupId === "none") {
+      toast.message("Select a group");
+      return;
+    }
+    setInviting(true);
+    try {
+      const res = await apiFetch<{ sentCount?: number; failedCount?: number; message?: string }>(
+        "/api/users/send-invitations",
+        {
+          method: "POST",
+          body: {
+            clientIds: inviteMode === "clients" ? inviteIds : [],
+            groupId: inviteMode === "group" && inviteGroupId !== "none" ? inviteGroupId : undefined,
+            campaignId: inviteCampaignId !== "none" ? inviteCampaignId : undefined,
+          },
+          onUnauthorized: () => {
+            logout();
+            router.replace("/admin/login");
+          },
+        }
+      );
+      toast.success(res?.message || "Invitations sent");
+      setInviteDialogOpen(false);
+      setInviteIds([]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to send invitations";
+      toast.error(message);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const openCreateGroup = () => {
+    const ids = Object.entries(selected)
+      .filter(([, val]) => val)
+      .map(([id]) => Number(id));
+    if (ids.length === 0) {
+      toast.message("Select at least one client to create a group");
+      return;
+    }
+    setInviteIds(ids);
+    setGroupName("");
+    setGroupDialogOpen(true);
+  };
+
+  const handleCreateGroup = async () => {
+    if (!groupName.trim()) {
+      toast.message("Group name is required");
+      return;
+    }
+    try {
+      const res = await apiFetch<Group>("/api/groups", {
+        method: "POST",
+        body: { name: groupName.trim(), clientIds: inviteIds },
+        onUnauthorized: () => {
+          logout();
+          router.replace("/admin/login");
+        },
+      });
+      setGroups((prev) => [res, ...prev]);
+      setGroupDialogOpen(false);
+      toast.success("Group created");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create group";
+      toast.error(message);
+    }
+  };
   const handleUpdate = async (client: Client) => {
     const name = editName.trim();
     const email = editEmail.trim();
@@ -159,35 +261,6 @@ export default function AdminClientsPage() {
     }
   };
 
-  const handleSendInvitations = async () => {
-    const ids = Object.entries(selected)
-      .filter(([, val]) => val)
-      .map(([id]) => Number(id));
-    if (ids.length === 0) {
-      toast.message("Select at least one client");
-      return;
-    }
-    setInviting(true);
-    try {
-      const res = await apiFetch<{ sentCount?: number; failedCount?: number; message?: string }>(
-        "/api/users/send-invitations",
-        {
-          method: "POST",
-          body: { clientIds: ids, campaignId: selectedCampaignId !== "none" ? selectedCampaignId : undefined },
-          onUnauthorized: () => {
-            logout();
-            router.replace("/admin/login");
-          },
-        }
-      );
-      toast.success(res?.message || "Invitations sent");
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to send invitations";
-      toast.error(message);
-    } finally {
-      setInviting(false);
-    }
-  };
 
   return (
     <>
@@ -204,7 +277,10 @@ export default function AdminClientsPage() {
             <Button asChild variant="outline" size="sm">
               <Link href="/admin/clients/bulk-upload">Bulk Upload (.csv)</Link>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleSendInvitations} disabled={inviting || loading}>
+            <Button variant="outline" size="sm" onClick={openCreateGroup}>
+              Create Group
+            </Button>
+            <Button variant="outline" size="sm" onClick={openInviteDialog} disabled={inviting || loading}>
               {inviting ? "Sending..." : "Send Invitations"}
             </Button>
           </div>
@@ -220,22 +296,6 @@ export default function AdminClientsPage() {
               }}
               className="max-w-sm"
             />
-            <div className="flex items-center gap-2">
-              <Label className="text-sm text-slate-700">Campaign</Label>
-              <Select value={selectedCampaignId} onValueChange={(v) => setSelectedCampaignId(v)}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {campaigns.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
           <Table>
             <TableHeader>
@@ -349,6 +409,80 @@ export default function AdminClientsPage() {
             <Button onClick={() => editing && handleUpdate(editing)} disabled={!editName.trim() || !editEmail.trim()}>
               Save
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{inviteMode === "group" ? "Select group and campaign" : "Select a campaign"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {inviteMode === "group" ? (
+              <>
+                <Label className="text-sm text-slate-700">Group</Label>
+                <Select value={inviteGroupId} onValueChange={setInviteGroupId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Select group</SelectItem>
+                    {groups.map((g) => (
+                      <SelectItem key={g.id} value={String(g.id)}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            ) : null}
+            <Label className="text-sm text-slate-700">Campaign</Label>
+            <Select value={inviteCampaignId} onValueChange={setInviteCampaignId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {campaigns.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-500">
+              Choose a campaign to attach to these invitations{inviteMode === "group" ? " and a group." : "."}
+            </p>
+          </div>
+          <DialogFooter className="mt-4 flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendInvitations} disabled={inviting}>
+              {inviting ? "Sending..." : "Send Invitations"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create group</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label className="text-sm text-slate-700">Group name</Label>
+            <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="New group name" />
+            <p className="text-xs text-slate-500">
+              This group will include the currently selected clients.
+            </p>
+          </div>
+          <DialogFooter className="mt-4 flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => setGroupDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateGroup}>Create Group</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
