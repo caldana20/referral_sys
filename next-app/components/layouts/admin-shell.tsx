@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTenant } from "@/components/providers/tenant-provider";
 
 type AdminShellProps = {
@@ -13,17 +14,26 @@ type AdminShellProps = {
   activePath?: string;
 };
 
-const navItems = [
+const mainItems = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/clients", label: "Clients" },
   { href: "/admin/referrals", label: "Referrals" },
+  { href: "/admin/groups", label: "Groups" },
+];
+
+const marketingItems = [
+  { href: "/admin/campaigns", label: "Campaigns" },
   { href: "/admin/rewards", label: "Rewards" },
   { href: "/admin/products", label: "Products" },
+];
+
+const operationsItems = [
   { href: "/admin/media", label: "Media" },
-  { href: "/admin/campaigns", label: "Campaigns" },
-  { href: "/admin/billing", label: "Billing" },
-  { href: "/admin/tenants/settings", label: "Tenant Settings" },
   { href: "/admin/estimate-fields", label: "Estimate Fields" },
+];
+
+const businessItems = [
+  { href: "/admin/billing", label: "Billing" },
   { href: "/admin/admins", label: "Admins" },
 ];
 
@@ -35,6 +45,7 @@ export function AdminShell({
 }: AdminShellProps) {
   const { tenantName, tenantSlug } = useTenant();
   const displayTenant = tenantName || tenantSlug || "Tenant";
+  const isActiveGroup = (items: { href: string }[]) => items.some((item) => item.href === activePath);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -58,20 +69,97 @@ export function AdminShell({
         </div>
         <nav className="border-t bg-white">
           <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-2 text-sm">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
+            <DropdownMenu>
+              <DropdownMenuTrigger
                 className={cn(
                   "rounded-md px-3 py-2 font-medium transition-colors",
-                  activePath === item.href
+                  isActiveGroup(mainItems)
                     ? "bg-slate-900 text-white"
                     : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                 )}
               >
-                {item.label}
-              </Link>
-            ))}
+                Main
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {mainItems.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link href={item.href}>{item.label}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  "rounded-md px-3 py-2 font-medium transition-colors",
+                  isActiveGroup(marketingItems)
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                Marketing
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {marketingItems.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link href={item.href}>{item.label}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  "rounded-md px-3 py-2 font-medium transition-colors",
+                  isActiveGroup(operationsItems)
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                Operations
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {operationsItems.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link href={item.href}>{item.label}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  "rounded-md px-3 py-2 font-medium transition-colors",
+                  isActiveGroup(businessItems)
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                Business
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {businessItems.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link href={item.href}>{item.label}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Link
+              href="/admin/tenants/settings"
+              className={cn(
+                "rounded-md px-3 py-2 font-medium transition-colors",
+                activePath === "/admin/tenants/settings"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+              )}
+            >
+              Tenant Settings
+            </Link>
           </div>
         </nav>
       </header>

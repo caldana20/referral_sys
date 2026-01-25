@@ -10,6 +10,8 @@ const Product = require('./Product');
 const Campaign = require('./Campaign');
 const CampaignReward = require('./CampaignReward');
 const Media = require('./Media');
+const Group = require('./Group');
+const GroupMember = require('./GroupMember');
 
 // Tenant relationships
 Tenant.hasMany(User, { foreignKey: 'tenantId' });
@@ -29,6 +31,12 @@ TenantHost.belongsTo(Tenant, { foreignKey: 'tenantId' });
 
 Tenant.hasOne(TenantSender, { foreignKey: 'tenantId' });
 TenantSender.belongsTo(Tenant, { foreignKey: 'tenantId' });
+
+// Groups
+Tenant.hasMany(Group, { foreignKey: 'tenantId' });
+Group.belongsTo(Tenant, { foreignKey: 'tenantId' });
+Group.belongsToMany(User, { through: GroupMember, foreignKey: 'groupId', otherKey: 'userId' });
+User.belongsToMany(Group, { through: GroupMember, foreignKey: 'userId', otherKey: 'groupId' });
 
 // Media
 Tenant.hasMany(Media, { foreignKey: 'tenantId' });
@@ -83,7 +91,9 @@ const db = {
   Product,
   Campaign,
   CampaignReward,
-  Media
+  Media,
+  Group,
+  GroupMember
 };
 
 module.exports = db;
