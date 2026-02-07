@@ -22,5 +22,13 @@ const requireAdmin = (req, res, next) => {
   }
 };
 
-module.exports = { authenticateToken, requireAdmin };
+const requireSuperAdmin = (req, res, next) => {
+  if (req.user && req.user.role === 'super_admin') {
+    next();
+  } else {
+    res.sendStatus(403);
+  }
+};
+
+module.exports = { authenticateToken, requireAdmin, requireSuperAdmin };
 

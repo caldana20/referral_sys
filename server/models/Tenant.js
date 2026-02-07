@@ -87,6 +87,19 @@ const Tenant = sequelize.define('Tenant', {
   subscriptionCurrentPeriodEnd: {
     type: DataTypes.DATE,
     allowNull: true
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true
+  },
+  deactivatedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  deletedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 });
 

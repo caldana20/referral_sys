@@ -266,59 +266,18 @@ exports.sendInvitations = async (req, res) => {
         // Create personalized link that will pre-fill their information
         const personalizedLink = `${await buildTenantBaseUrl(tenant.id)}/generate-referral?token=${token}`;
 
-        const emailHtml = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <h2 style="color: #2563eb; margin: 0;">${companyName}</h2>
-            </div>
-            
-            <div style="text-align: center; background-color: #eff6ff; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
-              <h1 style="color: #1e40af; margin-top: 0; font-size: 24px;">Earn Rewards by Referring Friends!</h1>
-              <p style="color: #374151; font-size: 16px;">
-                Start earning rewards today with our referral program.
-              </p>
-              ${
-                campaignName
-                  ? `<p style="color: #1e3a8a; font-size: 14px; margin-top: 8px;"><strong>Campaign:</strong> ${campaignName}</p>`
-                  : ""
-              }
-            </div>
-
-            <div style="color: #4b5563; font-size: 15px; line-height: 1.6;">
-              <p>Hi ${client.name},</p>
-              <p>We're excited to introduce our <strong>Referral Reward Program</strong>! As a valued client, you can now earn amazing rewards simply by sharing ${companyName} with your friends and family.</p>
-              
-              <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #22c55e;">
-                <h3 style="color: #166534; margin-top: 0;">How It Works:</h3>
-                <ol style="padding-left: 20px; color: #374151;">
-                  <li>Click the button below to access your personalized referral form</li>
-                  <li>Your information will be pre-filled automatically</li>
-                  <li>Generate your unique referral link and share it with friends and family</li>
-                  <li>When they request an estimate using your link, you earn rewards!</li>
-                  <li>Rewards are activated once their service is completed</li>
-                </ol>
-              </div>
-
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${personalizedLink}" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-                  Get Started - Generate Your Referral Link
-                </a>
-              </div>
-
-              <p style="margin-top: 20px;">It's that simple! Click the button above to create your referral link and start earning rewards today. Your information will be automatically filled in for your convenience.</p>
-            </div>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
-              <p>Thank you for being a valued ${companyName} client!</p>
-              <p>&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
-            </div>
-          </div>
-        `;
+        const { resolveEmailTemplate } = require('../utils/emailTemplates');
+        const template = await resolveEmailTemplate(tenant.id, 'client_invite', {
+          companyName,
+          clientName: client.name,
+          campaignName,
+          personalizedLink
+        });
 
         await sendEmail({
           to: client.email,
-          subject: `Start Earning Rewards with ${companyName}! 🎁`,
-          html: emailHtml,
+          subject: template.subject,
+          html: template.html,
           fromEmail,
           fromName
         });

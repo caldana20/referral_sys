@@ -63,6 +63,8 @@ async function buildTenantBaseUrl(tenantId) {
   return `${protocol ? `${protocol}://` : ''}${clean}`;
 }
 
+exports.buildTenantBaseUrl = buildTenantBaseUrl;
+
 async function cloneReferralForReuse(referral) {
   const code = crypto.randomBytes(4).toString('hex');
   const newRef = await Referral.create({
@@ -169,46 +171,21 @@ exports.createReferral = async (req, res) => {
     const referralLink = `${baseUrl}/referral/${code}`;
     
     // --- Send Email to Client ---
-    const clientEmailSubject = `Your ${companyName} Referral Link is Ready! ✨`;
-    const clientEmailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #2563eb; margin: 0;">${companyName}</h2>
-        </div>
-        
-        <div style="text-align: center; background-color: #f0f9ff; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
-          <h1 style="color: #1e3a8a; margin-top: 0; font-size: 24px;">Your Link is Ready!</h1>
-          <p style="color: #4b5563; font-size: 16px;">Here is your unique referral link to share with your friend.</p>
-          
-          <div style="background-color: #ffffff; padding: 15px; border: 2px dashed #2563eb; border-radius: 6px; margin: 20px 0; word-break: break-all;">
-            <a href="${referralLink}" style="color: #2563eb; text-decoration: none; font-weight: bold; font-size: 18px;">${referralLink}</a>
-          </div>
-          
-          <p style="color: #4b5563; margin-bottom: 0;">Reward selected: <strong>${selectedReward}</strong></p>
-        </div>
-
-        <div style="color: #6b7280; font-size: 14px; line-height: 1.5;">
-          <p><strong>What's next?</strong></p>
-          <ol>
-            <li>Share this link with your friend.</li>
-            <li>When they request an estimate using your link, we'll track it.</li>
-            <li>Once their service is completed, you earn your reward!</li>
-          </ol>
-          ${prospectName ? `<p>We've noted that this link is for <strong>${prospectName}</strong>.</p>` : ''}
-        </div>
-        
-        <div style="margin-top: 30px; pt-20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
-          <p>&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
-        </div>
-      </div>
-    `;
+    const { resolveEmailTemplate } = require('../utils/emailTemplates');
+    const clientTemplate = await resolveEmailTemplate(tenant.id, 'referral_link_client', {
+      companyName,
+      clientName: user.name,
+      referralLink,
+      selectedReward,
+      prospectName
+    });
 
     // Send to Client
     console.log('Email send (referral->client)', { tenant: tenant.slug, fromEmail, fromName, to: user.email });
     sendEmail({
       to: user.email,
-      subject: clientEmailSubject,
-      html: clientEmailHtml,
+      subject: clientTemplate.subject,
+      html: clientTemplate.html,
       fromEmail,
       fromName
     }).catch(err => console.error('Failed to send referral confirmation email to client:', err));
@@ -219,32 +196,20 @@ exports.createReferral = async (req, res) => {
         const adminEmails = admins.map(a => a.email);
 
         if (adminEmails.length > 0) {
-            const adminEmailHtml = `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
-                <h2 style="color: #2563eb; text-align: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">New Referral Link Created</h2>
-                <p style="font-size: 16px; color: #374151;">A client has generated a new referral link.</p>
-                
-                <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; border: 1px solid #e5e7eb;">
-                    <ul style="list-style: none; padding: 0; margin: 0;">
-                        <li style="margin-bottom: 8px;"><strong>Client Name:</strong> ${user.name}</li>
-                        <li style="margin-bottom: 8px;"><strong>Client Email:</strong> ${user.email}</li>
-                        <li style="margin-bottom: 8px;"><strong>Reward Selected:</strong> <span style="color: #059669; font-weight: bold;">${selectedReward}</span></li>
-                        <li style="margin-bottom: 8px;"><strong>Target Prospect:</strong> ${prospectName || 'N/A'}</li>
-                        <li><strong>Referral Code:</strong> <code style="background-color: #e0f2fe; color: #0284c7; padding: 2px 4px; border-radius: 4px;">${code}</code></li>
-                    </ul>
-                </div>
-                
-                <div style="margin-top: 20px; font-size: 14px; color: #6b7280; text-align: center;">
-                    ${companyName} Admin Notification
-                </div>
-              </div>
-            `;
+            const adminTemplate = await resolveEmailTemplate(tenant.id, 'referral_link_admin', {
+              companyName,
+              clientName: user.name,
+              clientEmail: user.email,
+              selectedReward,
+              prospectName: prospectName || 'N/A',
+              code
+            });
 
             console.log('Email send (referral->admins)', { tenant: tenant.slug, fromEmail, fromName, to: adminEmails });
             sendEmail({
                 to: adminEmails,
-                subject: `New ${companyName} Referral Link Generated`,
-                html: adminEmailHtml,
+                subject: adminTemplate.subject,
+                html: adminTemplate.html,
                 fromEmail,
                 fromName
             }).catch(err => console.error('Failed to send admin notification for new referral:', err));
@@ -310,51 +275,19 @@ exports.updateReferralStatus = async (req, res) => {
     // Send email notification when referral is closed
     if (status === 'Closed' && previousStatus !== 'Closed' && referral.User) {
       try {
-        const clientEmailHtml = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <h2 style="color: #2563eb; margin: 0;">${companyName}</h2>
-            </div>
-            
-            <div style="text-align: center; background-color: #f0fdf4; padding: 30px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
-              <h1 style="color: #166534; margin-top: 0; font-size: 24px;">Your Reward Has Been Activated! 🎉</h1>
-              <p style="color: #374151; font-size: 16px;">
-                Great news! Your referral reward has been closed and is now ready to use.
-              </p>
-            </div>
-
-            <div style="color: #4b5563; font-size: 15px; line-height: 1.6;">
-              <p>Hi ${referral.User.name},</p>
-              <p>We're excited to let you know that your referral reward has been successfully closed and activated!</p>
-              
-              <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb;">
-                <h3 style="color: #374151; margin-top: 0;">Referral Details:</h3>
-                <ul style="list-style: none; padding: 0; margin: 0;">
-                  <li style="margin-bottom: 10px;"><strong>Referral Code:</strong> <code style="background-color: #e0f2fe; color: #0284c7; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${referral.code}</code></li>
-                  <li style="margin-bottom: 10px;"><strong>Reward:</strong> <span style="color: #059669; font-weight: bold;">${referral.selectedReward}</span></li>
-                  ${referral.prospectName ? `<li style="margin-bottom: 10px;"><strong>Referred:</strong> ${referral.prospectName}</li>` : ''}
-                </ul>
-              </div>
-
-              <div style="background-color: #eff6ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
-                <h3 style="color: #1e40af; margin-top: 0;">What This Means:</h3>
-                <p style="margin: 0; color: #374151;">Your reward is now active and ready to use! Thank you for referring friends to ${companyName}. We truly appreciate your support.</p>
-              </div>
-
-              <p style="margin-top: 20px;">If you have any questions about your reward or need assistance, please don't hesitate to contact us.</p>
-            </div>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; text-align: center; color: #9ca3af; font-size: 12px;">
-              <p>Thank you for being a valued ${companyName} client!</p>
-              <p>&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
-            </div>
-          </div>
-        `;
+        const { resolveEmailTemplate } = require('../utils/emailTemplates');
+        const rewardTemplate = await resolveEmailTemplate(tenant.id, 'referral_reward_closed', {
+          companyName,
+          clientName: referral.User.name,
+          referralCode: referral.code,
+          selectedReward: referral.selectedReward,
+          prospectName: referral.prospectName
+        });
 
         await sendEmail({
           to: referral.User.email,
-          subject: `Your ${companyName} Reward Has Been Activated! 🎉`,
-          html: clientEmailHtml,
+          subject: rewardTemplate.subject,
+          html: rewardTemplate.html,
           fromEmail,
           fromName
         });

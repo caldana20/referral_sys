@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const router = express.Router();
 const tenantController = require('../controllers/tenantController');
+const tenantEmailTemplateController = require('../controllers/tenantEmailTemplateController');
 const { authenticateToken, requireAdmin } = require('../middleware/authMiddleware');
 
 // Ensure logo directory exists
@@ -38,6 +39,9 @@ router.get('/settings', authenticateToken, requireAdmin, tenantController.getSet
 router.patch('/settings', authenticateToken, requireAdmin, upload.single('logo'), tenantController.updateSettings);
 router.get('/fields', authenticateToken, requireAdmin, tenantController.getFieldConfig);
 router.patch('/fields', authenticateToken, requireAdmin, tenantController.updateFieldConfig);
+router.get('/email-templates', authenticateToken, requireAdmin, tenantEmailTemplateController.listTemplates);
+router.put('/email-templates/:key', authenticateToken, requireAdmin, tenantEmailTemplateController.updateTemplate);
+router.post('/email-templates/:key/reset', authenticateToken, requireAdmin, tenantEmailTemplateController.resetTemplate);
 
 module.exports = router;
 

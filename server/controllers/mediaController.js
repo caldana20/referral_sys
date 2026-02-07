@@ -19,6 +19,10 @@ exports.list = async (req, res) => {
 
     res.json(withSigned);
   } catch (err) {
+    console.error('Media list failed', {
+      tenantId: req.user?.tenantId,
+      error: err?.message || err
+    });
     res.status(500).json({ message: 'Failed to load media', error: err.message });
   }
 };
@@ -49,6 +53,13 @@ exports.upload = async (req, res) => {
     json.signedUrl = signedUrl;
     res.status(201).json(json);
   } catch (err) {
+    console.error('Media upload failed', {
+      tenantId: req.user?.tenantId,
+      filename: req.file?.originalname,
+      contentType: req.file?.mimetype,
+      size: req.file?.size,
+      error: err?.message || err
+    });
     res.status(500).json({ message: 'Upload failed', error: err.message });
   }
 };

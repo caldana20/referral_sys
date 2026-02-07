@@ -16,6 +16,7 @@ const metricsRoutes = require('./routes/metricsRoutes');
 const billingRoutes = require('./routes/billingRoutes');
 const productRoutes = require('./routes/productRoutes');
 const campaignRoutes = require('./routes/campaignRoutes');
+const superAdminRoutes = require('./routes/superAdminRoutes');
 const billingController = require('./controllers/billingController');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
@@ -35,6 +36,7 @@ const PORT = process.env.PORT || 5000;
 // CORS: allow explicit origins and credentials (no wildcard when using credentials)
 const allowList = [
   process.env.CLIENT_URL,
+  process.env.PUBLIC_SITE_URL,
   "http://localhost:5173",
   "http://localhost:3000",
   "http://default.localhost:3000"
@@ -91,6 +93,17 @@ app.use('/uploads', express.static('uploads'));
 // Resolve tenant from host for all API routes (after static)
 app.use(tenantHostResolver());
 
+// Debug: log media requests to confirm reachability
+app.use('/api/media', (req, _res, next) => {
+  console.log('Media request', {
+    method: req.method,
+    path: req.path,
+    host: req.headers.host,
+    tenantHost: req.headers['x-tenant-host']
+  });
+  next();
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/estimates', estimateRoutes);
@@ -105,14 +118,47 @@ app.use('/api/products', productRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/super-admin', superAdminRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
   res.send('Referral System API');
 });
 
+function buildDefaultClientUrl(slug) {
+  const raw = process.env.HOST_BASE || process.env.CLIENT_URL_BASE || process.env.CLIENT_URL || 'http://localhost:3000';
+  const withProtocol = raw.startsWith('http') ? raw : `http://${raw}`;
+  try {
+    const u = new URL(withProtocol);
+    const cleanHost = u.hostname.replace(/^\*\./, '').replace(/^\*/, '').replace(/^\.+/, '');
+    u.hostname = `${slug}.${cleanHost}`;
+    return u.origin;
+  } catch {
+    return `${withProtocol.replace(/\/$/, '')}/${slug}`;
+  }
+}
+
 const seedDatabase = async () => {
   try {
+    const defaultSlug = process.env.DEFAULT_TENANT_SLUG || 'default';
+    let tenant = await db.Tenant.findOne({ where: { slug: defaultSlug } });
+    if (!tenant) {
+      tenant = await db.Tenant.create({
+        name: 'Default Tenant',
+        slug: defaultSlug,
+        clientUrl: buildDefaultClientUrl(defaultSlug)
+      });
+      if (process.env.HOST_BASE) {
+        const cleanBase = process.env.HOST_BASE.replace(/^\*\./, '').replace(/^\*/, '').replace(/^\.+/, '');
+        const host = `${defaultSlug}.${cleanBase}`.toLowerCase();
+        await db.TenantHost.findOrCreate({
+          where: { host },
+          defaults: { tenantId: tenant.id, isPrimary: true, verified: true }
+        });
+      }
+      console.log(`Default tenant created: ${tenant.slug}`);
+    }
+
     const adminCount = await db.User.count({ where: { role: 'admin' } });
     if (adminCount === 0) {
       const passwordHash = await bcrypt.hash('admin123', 10);
@@ -120,9 +166,35 @@ const seedDatabase = async () => {
         name: 'Admin User',
         email: 'admin@example.com',
         password_hash: passwordHash,
-        role: 'admin'
+        role: 'admin',
+        tenantId: tenant.id
       });
       console.log('Default admin created: admin@example.com / admin123');
+    }
+
+    const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || '').toLowerCase().trim();
+    const superAdminPassword = (process.env.SUPER_ADMIN_PASSWORD || '').trim();
+    if (superAdminEmail && superAdminPassword) {
+      const existing = await db.User.findOne({ where: { email: superAdminEmail } });
+      const passwordHash = await bcrypt.hash(superAdminPassword, 10);
+      if (!existing) {
+        await db.User.create({
+          name: 'Super Admin',
+          email: superAdminEmail,
+          password_hash: passwordHash,
+          role: 'super_admin',
+          tenantId: tenant.id
+        });
+        console.log(`Super admin created: ${superAdminEmail}`);
+      } else {
+        existing.password_hash = passwordHash;
+        existing.role = 'super_admin';
+        if (!existing.tenantId) {
+          existing.tenantId = tenant.id;
+        }
+        await existing.save();
+        console.log(`Super admin updated: ${superAdminEmail}`);
+      }
     }
 
     const clientCount = await db.User.count({ where: { role: 'client' } });
@@ -130,7 +202,8 @@ const seedDatabase = async () => {
       await db.User.create({
         name: 'John Doe',
         email: 'client@example.com',
-        role: 'client'
+        role: 'client',
+        tenantId: tenant.id
       });
       console.log('Default client created: client@example.com');
     }
