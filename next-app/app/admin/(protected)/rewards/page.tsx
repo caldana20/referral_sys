@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api-client";
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 type Reward = {
   id: number;
   name: string;
+  description?: string | null;
   active: boolean;
 };
 
@@ -24,6 +26,9 @@ export default function AdminRewardsPage() {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newReward, setNewReward] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [editingDescriptions, setEditingDescriptions] = useState<Record<number, string>>({});
+  const [savingId, setSavingId] = useState<number | null>(null);
 
   const loadRewards = useCallback(async () => {
     setLoading(true);
@@ -34,7 +39,17 @@ export default function AdminRewardsPage() {
           router.replace("/admin/login");
         },
       });
-      setRewards(Array.isArray(res) ? res : []);
+      const list = Array.isArray(res) ? res : [];
+      setRewards(list);
+      setEditingDescriptions((prev) => {
+        const next = { ...prev };
+        list.forEach((reward) => {
+          if (next[reward.id] == null) {
+            next[reward.id] = reward.description || "";
+          }
+        });
+        return next;
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load rewards";
       toast.error(message);
@@ -53,13 +68,14 @@ export default function AdminRewardsPage() {
     try {
       await apiFetch("/api/rewards", {
         method: "POST",
-        body: { name: newReward.trim() },
+        body: { name: newReward.trim(), description: newDescription.trim() },
         onUnauthorized: () => {
           logout();
           router.replace("/admin/login");
         },
       });
       setNewReward("");
+      setNewDescription("");
       await loadRewards();
       toast.success("Reward created");
     } catch (err: unknown) {
@@ -67,6 +83,27 @@ export default function AdminRewardsPage() {
       toast.error(message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleSaveDescription = async (id: number) => {
+    setSavingId(id);
+    try {
+      await apiFetch(`/api/rewards/${id}`, {
+        method: "PATCH",
+        body: { description: editingDescriptions[id] || "" },
+        onUnauthorized: () => {
+          logout();
+          router.replace("/admin/login");
+        },
+      });
+      await loadRewards();
+      toast.success("Description updated");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to update description";
+      toast.error(message);
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -100,6 +137,12 @@ export default function AdminRewardsPage() {
             onChange={(e) => setNewReward(e.target.value)}
             className="md:w-64"
           />
+          <Input
+            placeholder="Short description (optional)"
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
+            className="md:flex-1"
+          />
           <Button onClick={handleCreate} disabled={creating || !newReward.trim()}>
             {creating ? "Adding..." : "Add Reward"}
           </Button>
@@ -109,6 +152,7 @@ export default function AdminRewardsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead>Description</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[160px]">Actions</TableHead>
             </TableRow>
@@ -117,6 +161,25 @@ export default function AdminRewardsPage() {
             {rewards.map((reward) => (
               <TableRow key={reward.id}>
                 <TableCell>{reward.name}</TableCell>
+                <TableCell className="min-w-[280px]">
+                  <Textarea
+                    value={editingDescriptions[reward.id] ?? reward.description ?? ""}
+                    onChange={(e) =>
+                      setEditingDescriptions((prev) => ({ ...prev, [reward.id]: e.target.value }))
+                    }
+                    className="min-h-[80px]"
+                  />
+                  <div className="mt-2 flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSaveDescription(reward.id)}
+                      disabled={savingId === reward.id}
+                    >
+                      {savingId === reward.id ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
+                </TableCell>
                 <TableCell>
                   <Badge variant={reward.active ? "outline" : "secondary"}>
                     {reward.active ? "Active" : "Inactive"}
@@ -131,7 +194,7 @@ export default function AdminRewardsPage() {
             ))}
             {rewards.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-center text-sm text-slate-600">
+                <TableCell colSpan={4} className="text-center text-sm text-slate-600">
                   {loading ? "Loading rewards..." : "No rewards yet."}
                 </TableCell>
               </TableRow>

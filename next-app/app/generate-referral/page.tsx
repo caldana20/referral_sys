@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiFetch } from "@/lib/api-client";
 import { useTenant } from "@/components/providers/tenant-provider";
 
-type Reward = { id: number; name: string; active?: boolean };
+type Reward = { id: number; name: string; description?: string | null; active?: boolean };
 type AllowedReward = { id: number; name: string };
 
 function GenerateReferralHostContent() {
@@ -31,18 +32,24 @@ function GenerateReferralHostContent() {
   const [generatedLink, setGeneratedLink] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const tenantSlug = useMemo(() => ctxTenant || searchParams.get("tenant") || "", [ctxTenant, searchParams]);
   const token = searchParams.get("token");
 
-  const rewardOptions = useMemo(() => {
+  const rewardOptions = useMemo<Reward[]>(() => {
     if (allowedRewards && allowedRewards.length > 0) {
       const allowedNames = new Set(allowedRewards.map((r) => r.name));
       const filtered = rewards.filter((r) => allowedNames.has(r.name));
       if (filtered.length > 0) return filtered;
-      return allowedRewards.map((r) => ({ id: r.id, name: r.name || String(r.id) }));
+      return allowedRewards.map((r) => ({ id: r.id, name: r.name || String(r.id), description: null }));
     }
     return rewards;
   }, [allowedRewards, rewards]);
+
+  const selectedReward = useMemo(
+    () => rewardOptions.find((reward) => reward.name === formData.selectedReward) || null,
+    [rewardOptions, formData.selectedReward]
+  );
 
   useEffect(() => {
     const loadRewards = async () => {
@@ -167,21 +174,32 @@ function GenerateReferralHostContent() {
 
               <div className="space-y-1">
                 <Label>Reward</Label>
-                <Select
-                  value={formData.selectedReward}
-                  onValueChange={(value) => handleChange("selectedReward", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select reward" />
-                  </SelectTrigger>
-                  <SelectContent>
-                {rewardOptions.map((reward) => (
-                  <SelectItem key={reward.id} value={reward.name}>
-                    {reward.name}
-                  </SelectItem>
-                ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={formData.selectedReward}
+                    onValueChange={(value) => handleChange("selectedReward", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select reward" />
+                    </SelectTrigger>
+                    <SelectContent>
+                  {rewardOptions.map((reward) => (
+                    <SelectItem key={reward.id} value={reward.name}>
+                      {reward.name}
+                    </SelectItem>
+                  ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant={selectedReward?.description ? "outline" : "ghost"}
+                    className={`h-8 px-3 text-xs ${selectedReward?.description ? "border-slate-900 text-slate-900" : ""}`}
+                    onClick={() => setDetailOpen(true)}
+                    disabled={!selectedReward}
+                  >
+                    More details
+                  </Button>
+                </div>
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>
@@ -214,6 +232,22 @@ function GenerateReferralHostContent() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reward details</DialogTitle>
+          </DialogHeader>
+          {selectedReward ? (
+            <div className="space-y-2 text-sm text-slate-700">
+              <div className="font-medium text-slate-900">{selectedReward.name}</div>
+              <div>{selectedReward.description || "No description provided."}</div>
+            </div>
+          ) : (
+            <div className="text-sm text-slate-600">Select a reward to see details.</div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

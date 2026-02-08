@@ -17,6 +17,7 @@ type TenantSettings = {
   name: string;
   slug: string;
   logoUrl?: string | null;
+  logoMediaId?: number | null;
   address?: string | null;
   city?: string | null;
   state?: string | null;
@@ -81,6 +82,7 @@ export default function TenantSettingsPage() {
     if (data?.fromName) setFromName(data.fromName);
     if (data?.fromEmail) setFromEmail(data.fromEmail);
   };
+
 
   const loadMedia = async () => {
     setMediaLoading(true);
@@ -238,6 +240,7 @@ export default function TenantSettingsPage() {
           },
         });
         applySenderState(senderRes);
+
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to load settings";
         toast.error(message);
@@ -392,6 +395,7 @@ export default function TenantSettingsPage() {
       setResetting(false);
     }
   };
+
 
   const selectedLogoMedia = logoMediaId ? mediaItems.find((m) => m.id === logoMediaId) : null;
   const logoDisplay = logoPreview || selectedLogoMedia?.signedUrl || selectedLogoMedia?.url || settings?.logoUrl || null;

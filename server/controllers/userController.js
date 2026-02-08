@@ -28,9 +28,12 @@ exports.createUser = async (req, res) => {
   console.log('Creating user:', { name, email: normalizedEmail, role, phone });
 
   try {
-    const existingUser = await User.findOne({ where: { email: normalizedEmail, tenantId: req.user.tenantId } });
+    const existingUser = await User.findOne({ where: { email: normalizedEmail } });
     if (existingUser) {
-      return res.status(400).json({ message: 'User with this email already exists' });
+      if (existingUser.tenantId !== req.user.tenantId) {
+        return res.status(409).json({ message: 'Email already exists for another tenant' });
+      }
+      return res.status(409).json({ message: 'User with this email already exists' });
     }
 
     let passwordHash = null;
@@ -61,6 +64,9 @@ exports.createUser = async (req, res) => {
     res.status(201).json(userResponse);
   } catch (error) {
     console.error('Error creating user:', error);
+    if (error?.name === 'SequelizeUniqueConstraintError') {
+      return res.status(409).json({ message: 'User with this email already exists' });
+    }
     res.status(500).json({ message: 'Server error creating user', error: error.message });
   }
 };

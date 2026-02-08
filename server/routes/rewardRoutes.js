@@ -11,6 +11,7 @@ router.get('/active', rewardController.getActiveRewards);
 // Admin routes
 router.get('/', authenticateToken, requireAdmin, rewardController.getRewards);
 router.post('/', authenticateToken, requireAdmin, rewardController.createReward);
+router.patch('/:id', authenticateToken, requireAdmin, rewardController.updateReward);
 router.delete('/:id', authenticateToken, requireAdmin, rewardController.deleteReward);
 router.patch('/:id/toggle', authenticateToken, requireAdmin, rewardController.toggleReward);
 

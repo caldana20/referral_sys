@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: refoza-backend
+  namespace: refoza
+spec:
+  selector:
+    app: refoza-backend
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000

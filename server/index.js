@@ -37,6 +37,7 @@ const PORT = process.env.PORT || 5000;
 const allowList = [
   process.env.CLIENT_URL,
   process.env.PUBLIC_SITE_URL,
+  process.env.BILLING_SITE_URL,
   "http://localhost:5173",
   "http://localhost:3000",
   "http://default.localhost:3000"

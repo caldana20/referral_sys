@@ -33,17 +33,31 @@ exports.getActiveRewards = async (req, res) => {
 };
 
 exports.createReward = async (req, res) => {
-  const { name } = req.body;
+  const { name, description } = req.body;
   if (!name) return res.status(400).json({ message: 'Reward name is required' });
 
   try {
     const tenantId = req.user?.tenantId || req.tenant?.tenantId;
     if (!tenantId) return res.status(400).json({ message: 'Tenant context is required' });
 
-    const reward = await RewardSetting.create({ name, tenantId });
+    const reward = await RewardSetting.create({ name, description: description || null, tenantId });
     res.status(201).json(reward);
   } catch (error) {
     console.error('Error creating reward:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.updateReward = async (req, res) => {
+  const { id } = req.params;
+  const { description } = req.body;
+  try {
+    const reward = await RewardSetting.findOne({ where: { id, tenantId: req.user.tenantId } });
+    if (!reward) return res.status(404).json({ message: 'Reward not found' });
+    reward.description = typeof description === 'string' ? description : reward.description;
+    await reward.save();
+    res.json(reward);
+  } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

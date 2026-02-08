@@ -1,6 +1,5 @@
-import { API_BASE_URL, isBrowser } from "./config";
-import { clearAuth, getToken } from "./auth-store";
-import { CURRENT_HOST } from "./config";
+import { API_BASE_URL, isBrowser, BILLING_HOST, CURRENT_HOST, TENANT_HOST_BASE } from "./config";
+import { clearAuth, getToken, getUser } from "./auth-store";
 
 export type ApiRequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -68,9 +67,19 @@ export async function apiFetch<T = unknown>(path: string, options?: ApiRequestOp
     delete (headers as Record<string, string>)["Content-Type"];
   }
 
-  // Send current host to backend so tenant can be resolved when API host differs
-  if (isBrowser && CURRENT_HOST) {
-    (headers as Record<string, string>)["X-Tenant-Host"] = CURRENT_HOST;
+  // Send tenant host to backend so tenant can be resolved when API host differs
+  if (isBrowser) {
+    const existing = (headers as Record<string, string>)["X-Tenant-Host"];
+    if (!existing) {
+      let tenantHost = CURRENT_HOST;
+      const user = getUser();
+      if (BILLING_HOST && CURRENT_HOST === BILLING_HOST && user?.tenantSlug && TENANT_HOST_BASE) {
+        tenantHost = `${user.tenantSlug}.${TENANT_HOST_BASE}`;
+      }
+      if (tenantHost) {
+        (headers as Record<string, string>)["X-Tenant-Host"] = tenantHost;
+      }
+    }
   }
 
   const res = await fetch(makeUrl(path), {

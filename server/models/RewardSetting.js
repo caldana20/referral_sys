@@ -19,6 +19,10 @@ const RewardSetting = sequelize.define('RewardSetting', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true

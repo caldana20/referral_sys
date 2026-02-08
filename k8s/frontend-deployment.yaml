@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: refoza-frontend
+  namespace: refoza
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: refoza-frontend
+  template:
+    metadata:
+      labels:
+        app: refoza-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: us-west1-docker.pkg.dev/refoza/refoza/frontend:v48
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: NEXT_PUBLIC_API_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: refoza-config
+                  key: NEXT_PUBLIC_API_BASE_URL
+            - name: NEXT_PUBLIC_SITE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: refoza-config
+                  key: NEXT_PUBLIC_SITE_HOST
+            - name: NEXT_PUBLIC_BILLING_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: refoza-config
+                  key: NEXT_PUBLIC_BILLING_HOST
+            - name: NEXT_PUBLIC_TENANT_HOST_BASE
+              valueFrom:
+                configMapKeyRef:
+                  name: refoza-config
+                  key: NEXT_PUBLIC_TENANT_HOST_BASE
+          readinessProbe:
+            httpGet:
+              path: /admin/login
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /admin/login
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 20

@@ -9,14 +9,15 @@ const { resolveEmailTemplate } = require('../utils/emailTemplates');
 require('dotenv').config();
 
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, tenantSlug } = req.body;
 
   try {
-    // tenant context derived from host resolver
-    if (!req.tenant || !req.tenant.tenantId) {
-      return res.status(400).json({ message: 'Unable to resolve tenant from host' });
-    }
-    const tenant = await Tenant.findByPk(req.tenant.tenantId);
+    const normalizedSlug = (tenantSlug || '').toString().trim().toLowerCase();
+    const tenant = normalizedSlug
+      ? await Tenant.findOne({ where: { slug: normalizedSlug } })
+      : req.tenant?.tenantId
+        ? await Tenant.findByPk(req.tenant.tenantId)
+        : null;
     if (!tenant) return res.status(401).json({ message: 'Invalid tenant' });
     if (tenant.deletedAt || tenant.isActive === false) {
       return res.status(403).json({ message: 'Tenant is deactivated' });

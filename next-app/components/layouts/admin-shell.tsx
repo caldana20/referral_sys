@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTenant } from "@/components/providers/tenant-provider";
+import { useAuth } from "@/components/providers/auth-provider";
+import { BILLING_HOST, isBrowser } from "@/lib/config";
 
 type AdminShellProps = {
   children: ReactNode;
@@ -30,6 +32,7 @@ const marketingItems = [
 const operationsItems = [
   { href: "/admin/media", label: "Media" },
   { href: "/admin/estimate-fields", label: "Estimate Fields" },
+  { href: "/admin/email-templates", label: "Email Templates" },
 ];
 
 const businessItems = [
@@ -44,8 +47,14 @@ export function AdminShell({
   activePath = "",
 }: AdminShellProps) {
   const { tenantName, tenantSlug } = useTenant();
+  const { user } = useAuth();
   const displayTenant = tenantName || tenantSlug || "Tenant";
+  const displayUser = user?.name || user?.email || "Account";
   const isActiveGroup = (items: { href: string }[]) => items.some((item) => item.href === activePath);
+  const billingHref =
+    isBrowser && BILLING_HOST
+      ? `${window.location.protocol}//${BILLING_HOST}/billing`
+      : "/admin/billing";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -62,9 +71,19 @@ export function AdminShell({
               {displayTenant}
             </span>
             <Separator orientation="vertical" className="h-6" />
-            <Link href="/admin/logout" className="hover:text-slate-900">
-              Logout
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="rounded-md px-2 py-1 text-sm font-medium text-slate-700 hover:text-slate-900">
+                {displayUser}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/account/password">Change Password</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/logout">Logout</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         <nav className="border-t bg-white">
@@ -143,7 +162,9 @@ export function AdminShell({
               <DropdownMenuContent align="start">
                 {businessItems.map((item) => (
                   <DropdownMenuItem key={item.href} asChild>
-                    <Link href={item.href}>{item.label}</Link>
+                    <Link href={item.label === "Billing" ? billingHref : item.href}>
+                      {item.label}
+                    </Link>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>

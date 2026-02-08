@@ -36,6 +36,23 @@ function resolveUrl(req, envVar, fallbackPath = '/admin') {
   return `${proto}://${host}${fallbackPath}`;
 }
 
+async function sendInvoiceIfNeeded(invoiceId) {
+  if (!invoiceId || !stripe) return;
+  try {
+    const invoice = await stripe.invoices.retrieve(invoiceId.toString());
+    if (!invoice || invoice.status === 'void') return;
+    if (invoice.status === 'draft') {
+      await stripe.invoices.finalizeInvoice(invoice.id);
+    }
+    await stripe.invoices.sendInvoice(invoice.id);
+  } catch (err) {
+    console.error('Stripe invoice send failed:', {
+      invoiceId,
+      error: err?.message || err
+    });
+  }
+}
+
 exports.createCheckoutSession = async (req, res) => {
   if (!requireStripe(res)) return;
   const tenantId = req.user?.tenantId || req.tenant?.tenantId;
@@ -152,6 +169,9 @@ exports.handleWebhook = async (req, res) => {
             await tenant.save();
           }
         }
+        if (session.invoice) {
+          await sendInvoiceIfNeeded(session.invoice);
+        }
         break;
       }
       case 'customer.subscription.updated':
@@ -171,6 +191,9 @@ exports.handleWebhook = async (req, res) => {
             ? new Date(sub.current_period_end * 1000)
             : null;
           await tenant.save();
+        }
+        if (sub.latest_invoice) {
+          await sendInvoiceIfNeeded(sub.latest_invoice);
         }
         break;
       }

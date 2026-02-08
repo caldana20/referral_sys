@@ -15,3 +15,12 @@ if (!isBrowser && !envHost) {
 
 export const CURRENT_HOST = isBrowser ? window.location.hostname : envHost as string;
 
+export const BILLING_HOST = process.env.NEXT_PUBLIC_BILLING_HOST?.toLowerCase() || null;
+
+const derivedTenantBase = envHost
+  ? envHost.replace(/^[^.]+\./, "").toLowerCase()
+  : null;
+
+export const TENANT_HOST_BASE =
+  process.env.NEXT_PUBLIC_TENANT_HOST_BASE?.toLowerCase() || derivedTenantBase;
+

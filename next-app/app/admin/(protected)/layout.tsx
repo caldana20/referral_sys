@@ -8,25 +8,28 @@ import { useAuth, isAuthenticated } from "@/components/providers/auth-provider";
 export default function AdminProtectedLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setHydrated(true);
     if (!isAuthenticated()) {
       router.replace("/admin/login");
+      return;
     }
-  }, [router, user]);
+    if (user && user.role !== "admin") {
+      logout();
+      router.replace("/admin/login");
+    }
+  }, [router, user, logout]);
 
-  if (!hydrated || !isAuthenticated()) {
+  if (!hydrated || !isAuthenticated() || (user && user.role !== "admin")) {
     return null;
   }
 
   return (
     <AdminShell
       activePath={pathname || "/admin"}
-      title="Admin"
-      description="Manage clients, referrals, rewards, and invitations."
     >
       {children}
     </AdminShell>
