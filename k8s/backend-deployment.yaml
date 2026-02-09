@@ -80,6 +80,16 @@ spec:
                 secretKeyRef:
                   name: refoza-secrets
                   key: JWT_SECRET
+            - name: SUPER_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: refoza-secrets
+                  key: SUPER_ADMIN_EMAIL
+            - name: SUPER_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: refoza-secrets
+                  key: SUPER_ADMIN_PASSWORD
             - name: SENDGRID_API_KEY
               valueFrom:
                 secretKeyRef:
