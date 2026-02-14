@@ -1,6 +1,6 @@
- "use client";
+"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MoreVertical } from "lucide-react";
+import { Mail, MoreVertical, Upload, UserPlus, Users } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
 import { toast } from "sonner";
@@ -101,6 +101,27 @@ export default function AdminClientsPage() {
     const q = query.toLowerCase();
     return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
   });
+  const selectedCount = useMemo(
+    () => Object.values(selected).filter(Boolean).length,
+    [selected]
+  );
+  const stats = [
+    {
+      label: "Total clients",
+      value: clients.length,
+      icon: Users,
+    },
+    {
+      label: "Filtered results",
+      value: filtered.length,
+      icon: Mail,
+    },
+    {
+      label: "Selected",
+      value: selectedCount,
+      icon: UserPlus,
+    },
+  ];
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const handlePageChange = (delta: number) => {
@@ -263,19 +284,74 @@ export default function AdminClientsPage() {
 
 
   return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+    <div className="space-y-6">
+      <section className="rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div>
+            <Badge variant="secondary" className="mb-3 px-3 py-1 text-xs uppercase tracking-[0.25em]">
+              Client directory
+            </Badge>
+            <h1 className="font-display text-3xl text-slate-900">Manage your clients</h1>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+              Invite clients, generate referral links, and organize groups for targeted campaigns.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm">
+              <Link href="/admin/clients/new">
+                <UserPlus className="h-4 w-4" />
+                Add Client
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/clients/bulk-upload">
+                <Upload className="h-4 w-4" />
+                Bulk Upload
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" onClick={openCreateGroup}>
+              Create Group
+            </Button>
+            <Button variant="outline" size="sm" onClick={openInviteDialog} disabled={inviting || loading}>
+              {inviting ? "Sending..." : "Send Invitations"}
+            </Button>
+          </div>
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {stats.map((stat) => (
+            <Card key={stat.label} className="rounded-2xl border-slate-200/70 bg-white">
+              <CardContent className="flex items-center justify-between gap-3 pt-6">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{stat.label}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">{stat.value}</p>
+                </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <stat.icon className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <Card className="rounded-3xl border-slate-200/70 bg-white">
+        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <CardTitle>Clients</CardTitle>
             <CardDescription>Invite clients, generate referral links, and bulk import.</CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button asChild size="sm">
-              <Link href="/admin/clients/new">Add Client</Link>
+              <Link href="/admin/clients/new">
+                <UserPlus className="h-4 w-4" />
+                Add Client
+              </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <Link href="/admin/clients/bulk-upload">Bulk Upload (.csv)</Link>
+              <Link href="/admin/clients/bulk-upload">
+                <Upload className="h-4 w-4" />
+                Bulk Upload
+              </Link>
             </Button>
             <Button variant="outline" size="sm" onClick={openCreateGroup}>
               Create Group
@@ -286,7 +362,7 @@ export default function AdminClientsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <Input
               placeholder="Search by name or email"
               value={query}
@@ -296,6 +372,11 @@ export default function AdminClientsPage() {
               }}
               className="max-w-sm"
             />
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              <span>{filtered.length} results</span>
+              <span className="hidden sm:inline">•</span>
+              <span>{selectedCount} selected</span>
+            </div>
           </div>
           <Table>
             <TableHeader>
@@ -321,7 +402,9 @@ export default function AdminClientsPage() {
                   <TableCell>{client.email}</TableCell>
                   <TableCell>{client.phone || "—"}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">{client.role}</Badge>
+                    <Badge variant="outline" className="border-primary/30 text-primary">
+                      {client.role}
+                    </Badge>
                   </TableCell>
                   <TableCell className="space-y-2">
                     <div className="flex flex-wrap gap-2">
@@ -352,14 +435,16 @@ export default function AdminClientsPage() {
                       </DropdownMenu>
                     </div>
                     {links[client.id] ? (
-                      <div className="text-xs text-slate-600 break-all">{links[client.id]}</div>
+                      <div className="rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-2 text-xs text-muted-foreground break-all">
+                        {links[client.id]}
+                      </div>
                     ) : null}
                   </TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-slate-600">
+                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                     {loading ? "Loading clients..." : "No clients found."}
                   </TableCell>
                 </TableRow>
@@ -367,7 +452,7 @@ export default function AdminClientsPage() {
             </TableBody>
           </Table>
 
-          <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <div>
               Page {page} of {totalPages} · {clients.length} total
             </div>
@@ -451,7 +536,7 @@ export default function AdminClientsPage() {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               Choose a campaign to attach to these invitations{inviteMode === "group" ? " and a group." : "."}
             </p>
           </div>
@@ -474,7 +559,7 @@ export default function AdminClientsPage() {
           <div className="space-y-2">
             <Label className="text-sm text-slate-700">Group name</Label>
             <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="New group name" />
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               This group will include the currently selected clients.
             </p>
           </div>
@@ -486,7 +571,6 @@ export default function AdminClientsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
-

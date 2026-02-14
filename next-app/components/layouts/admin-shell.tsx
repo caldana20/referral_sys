@@ -57,22 +57,22 @@ export function AdminShell({
       : "/admin/billing";
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b bg-white">
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div>
             <div className="text-lg font-semibold text-slate-900">Referral Admin</div>
             {description ? (
-              <p className="text-sm text-slate-600">{description}</p>
+              <p className="text-sm text-muted-foreground">{description}</p>
             ) : null}
           </div>
           <div className="flex items-center gap-4 text-sm text-slate-700">
-            <span className="hidden sm:inline rounded-full bg-slate-900 px-3 py-1 text-white">
+            <span className="hidden sm:inline rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-primary">
               {displayTenant}
             </span>
             <Separator orientation="vertical" className="h-6" />
             <DropdownMenu>
-              <DropdownMenuTrigger className="rounded-md px-2 py-1 text-sm font-medium text-slate-700 hover:text-slate-900">
+              <DropdownMenuTrigger className="rounded-full px-3 py-1 text-sm font-medium text-slate-700 hover:text-slate-900">
                 {displayUser}
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -86,15 +86,15 @@ export function AdminShell({
             </DropdownMenu>
           </div>
         </div>
-        <nav className="border-t bg-white">
-          <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-2 text-sm">
+        <nav className="border-t border-slate-200/70 bg-white/70 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-3 text-sm">
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  "rounded-md px-3 py-2 font-medium transition-colors",
+                  "rounded-full px-4 py-2 font-medium transition-colors",
                   isActiveGroup(mainItems)
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-slate-700 hover:bg-primary/10 hover:text-slate-900"
                 )}
               >
                 Main
@@ -111,10 +111,10 @@ export function AdminShell({
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  "rounded-md px-3 py-2 font-medium transition-colors",
+                  "rounded-full px-4 py-2 font-medium transition-colors",
                   isActiveGroup(marketingItems)
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-slate-700 hover:bg-primary/10 hover:text-slate-900"
                 )}
               >
                 Marketing
@@ -131,10 +131,10 @@ export function AdminShell({
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  "rounded-md px-3 py-2 font-medium transition-colors",
+                  "rounded-full px-4 py-2 font-medium transition-colors",
                   isActiveGroup(operationsItems)
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-slate-700 hover:bg-primary/10 hover:text-slate-900"
                 )}
               >
                 Operations
@@ -151,10 +151,10 @@ export function AdminShell({
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  "rounded-md px-3 py-2 font-medium transition-colors",
+                  "rounded-full px-4 py-2 font-medium transition-colors",
                   isActiveGroup(businessItems)
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-slate-700 hover:bg-primary/10 hover:text-slate-900"
                 )}
               >
                 Business
@@ -173,10 +173,10 @@ export function AdminShell({
             <Link
               href="/admin/tenants/settings"
               className={cn(
-                "rounded-md px-3 py-2 font-medium transition-colors",
+                "rounded-full px-4 py-2 font-medium transition-colors",
                 activePath === "/admin/tenants/settings"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-slate-700 hover:bg-primary/10 hover:text-slate-900"
               )}
             >
               Tenant Settings
@@ -184,12 +184,11 @@ export function AdminShell({
           </div>
         </nav>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        {title ? <h1 className="text-2xl font-semibold text-slate-900">{title}</h1> : null}
-        {title ? <p className="mt-1 text-sm text-slate-600">{description}</p> : null}
+      <main className="mx-auto max-w-6xl px-6 py-10">
+        {title ? <h1 className="font-display text-3xl text-slate-900">{title}</h1> : null}
+        {title ? <p className="mt-2 text-sm text-muted-foreground">{description}</p> : null}
         <div className={cn(title ? "mt-6" : "")}>{children}</div>
       </main>
     </div>
   );
 }
-

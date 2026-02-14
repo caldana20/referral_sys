@@ -1,7 +1,8 @@
- "use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BarChart3, CircleCheck, CircleDot, Inbox } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type Referral = {
   id: number;
@@ -132,118 +134,178 @@ export default function AdminReferralsPage() {
       toast.error(message);
     }
   };
+  const summary = useMemo(() => {
+    const total = referrals.length;
+    const open = referrals.filter((r) => r.status === "Open").length;
+    const closed = referrals.filter((r) => r.status === "Closed").length;
+    const withEstimates = referrals.filter((r) => (r.Estimates || []).length > 0).length;
+    return { total, open, closed, withEstimates };
+  }, [referrals]);
+  const summaryCards = [
+    { label: "Total referrals", value: summary.total, icon: Inbox },
+    { label: "Open", value: summary.open, icon: CircleDot },
+    { label: "Closed", value: summary.closed, icon: CircleCheck },
+    { label: "With estimates", value: summary.withEstimates, icon: BarChart3 },
+  ];
 
   return (
-    <Card>
-      <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <CardTitle>Referrals</CardTitle>
-          <CardDescription>View referral links and associated estimates.</CardDescription>
+    <div className="space-y-6">
+      <section className="rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div>
+            <Badge variant="secondary" className="mb-3 px-3 py-1 text-xs uppercase tracking-[0.25em]">
+              Referral inbox
+            </Badge>
+            <h1 className="font-display text-3xl text-slate-900">Referrals</h1>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+              Track every referral link, prospect, and estimate from a single operational view.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleBulkDelete} disabled={loading}>
+              Delete Selected
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Input
-            placeholder="Search by client/prospect name or email"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="w-[260px]"
-          />
-          <Select value={filterStatus} onValueChange={(v: "All" | "Open" | "Closed") => setFilterStatus(v)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All</SelectItem>
-              <SelectItem value="Open">Open</SelectItem>
-              <SelectItem value="Closed">Closed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" onClick={handleBulkDelete} disabled={loading}>
-            Delete Selected
-          </Button>
-          <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
-            Refresh
-          </Button>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {summaryCards.map((card) => (
+            <Card key={card.label} className="rounded-2xl border-slate-200/70 bg-white">
+              <CardContent className="flex items-center justify-between gap-3 pt-6">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{card.label}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">{card.value}</p>
+                </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <card.icon className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">
-                <Checkbox checked={allSelected} onCheckedChange={handleSelectAll} />
-              </TableHead>
-              <TableHead>Code</TableHead>
-              <TableHead>Client</TableHead>
-              <TableHead>Campaign</TableHead>
-              <TableHead>Prospect</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-[120px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((referral) => (
-              <TableRow key={referral.id}>
-                <TableCell>
-                  <Checkbox
-                    checked={selectedIds[referral.id] || false}
-                    onCheckedChange={(c) => toggleSelect(referral.id, c)}
-                  />
-                </TableCell>
-                <TableCell className="font-mono text-xs">{referral.code}</TableCell>
-                <TableCell>
-                  <div className="text-sm font-medium">{referral.User?.name || "—"}</div>
-                  <div className="text-xs text-slate-600">{referral.User?.email}</div>
-                </TableCell>
-                <TableCell className="text-sm text-slate-700">
-                  {referral.Campaign?.name || "—"}
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm">
-                    {referral.Estimates?.[0]?.name || referral.prospectName || "—"}
-                  </div>
-                  <div className="text-xs text-slate-600">
-                    {referral.Estimates?.[0]?.email || referral.prospectEmail || ""}
-                  </div>
-                  {referral.Estimates?.[0]?.id ? (
-                    <div className="text-[11px]">
-                      <Link
-                        href={`/admin/estimates/${referral.Estimates[0].id}`}
-                        className="text-blue-700 underline"
-                      >
-                        Estimate #{referral.Estimates[0].id}
-                      </Link>
-                    </div>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={referral.status === "Closed" ? "outline" : "secondary"}>{referral.status}</Badge>
-                </TableCell>
-                <TableCell className="text-xs text-slate-600">
-                  {new Date(referral.createdAt).toLocaleString()}
-                </TableCell>
-                <TableCell>
-                  {referral.status !== "Closed" ? (
-                    <Button size="sm" variant="outline" onClick={() => handleClose(referral.id)}>
-                      Close
-                    </Button>
-                  ) : (
-                    <span className="text-xs text-slate-500">—</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 ? (
+      </section>
+
+      <Card className="rounded-3xl border-slate-200/70 bg-white">
+        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <CardTitle>Referral Activity</CardTitle>
+            <CardDescription>View referral links and associated estimates.</CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              placeholder="Search by client/prospect name or email"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-[260px]"
+            />
+            <Select value={filterStatus} onValueChange={(v: "All" | "Open" | "Closed") => setFilterStatus(v)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All</SelectItem>
+                <SelectItem value="Open">Open</SelectItem>
+                <SelectItem value="Closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-sm text-slate-600">
-                  {loading ? "Loading referrals..." : "No referrals found."}
-                </TableCell>
+                <TableHead className="w-[50px]">
+                  <Checkbox checked={allSelected} onCheckedChange={handleSelectAll} />
+                </TableHead>
+                <TableHead>Code</TableHead>
+                <TableHead>Client</TableHead>
+                <TableHead>Campaign</TableHead>
+                <TableHead>Prospect</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="w-[120px]">Actions</TableHead>
               </TableRow>
-            ) : null}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((referral) => (
+                <TableRow key={referral.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds[referral.id] || false}
+                      onCheckedChange={(c) => toggleSelect(referral.id, c)}
+                    />
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{referral.code}</TableCell>
+                  <TableCell>
+                    <div className="text-sm font-medium">{referral.User?.name || "—"}</div>
+                    <div className="text-xs text-muted-foreground">{referral.User?.email}</div>
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-700">
+                    {referral.Campaign?.name ? (
+                      <Badge variant="outline" className="border-primary/30 text-primary">
+                        {referral.Campaign.name}
+                      </Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      {referral.Estimates?.[0]?.name || referral.prospectName || "—"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {referral.Estimates?.[0]?.email || referral.prospectEmail || ""}
+                    </div>
+                    {referral.Estimates?.[0]?.id ? (
+                      <div className="text-[11px]">
+                        <Link
+                          href={`/admin/estimates/${referral.Estimates[0].id}`}
+                          className="text-primary underline"
+                        >
+                          Estimate #{referral.Estimates[0].id}
+                        </Link>
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "border-slate-200 text-slate-700",
+                        referral.status === "Open" && "border-amber-200 text-amber-700 bg-amber-50/70",
+                        referral.status === "Closed" && "border-emerald-200 text-emerald-700 bg-emerald-50/70"
+                      )}
+                    >
+                      {referral.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(referral.createdAt).toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    {referral.status !== "Closed" ? (
+                      <Button size="sm" variant="outline" onClick={() => handleClose(referral.id)}>
+                        Close
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                    {loading ? "Loading referrals..." : "No referrals found."}
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
-

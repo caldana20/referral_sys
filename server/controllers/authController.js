@@ -219,6 +219,7 @@ exports.requestPasswordReset = async (req, res) => {
         to: user.email,
         subject: template.subject,
         html: template.html,
+        tenantId: tenant.id,
         fromEmail,
         fromName
       });

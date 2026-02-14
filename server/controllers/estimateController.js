@@ -140,6 +140,7 @@ exports.createEstimate = async (req, res) => {
           to: adminEmails,
           subject: `New Estimate Request Received - ${companyName}`,
           html: emailContent,
+          tenantId: tenant.id,
           fromEmail,
           fromName
         });
@@ -197,6 +198,7 @@ exports.createEstimate = async (req, res) => {
                 to: referrerEmail,
                 subject: `Your ${companyName} Referral Code was Used! 🎉`,
                 html: clientEmailHtml,
+                tenantId: tenant.id,
                 fromEmail,
                 fromName
             }).catch(err => console.error('Failed to send referrer confirmation email:', err));
@@ -262,6 +264,7 @@ exports.createEstimate = async (req, res) => {
             to: email,
             subject: `Your Estimate Request Has Been Received ✨`,
             html: prospectEmailHtml,
+            tenantId: tenant.id,
             fromEmail,
             fromName
         }).catch(err => console.error('Failed to send prospect confirmation email:', err));

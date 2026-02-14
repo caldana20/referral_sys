@@ -186,6 +186,7 @@ exports.createReferral = async (req, res) => {
       to: user.email,
       subject: clientTemplate.subject,
       html: clientTemplate.html,
+      tenantId: tenant.id,
       fromEmail,
       fromName
     }).catch(err => console.error('Failed to send referral confirmation email to client:', err));
@@ -210,6 +211,7 @@ exports.createReferral = async (req, res) => {
                 to: adminEmails,
                 subject: adminTemplate.subject,
                 html: adminTemplate.html,
+                tenantId: tenant.id,
                 fromEmail,
                 fromName
             }).catch(err => console.error('Failed to send admin notification for new referral:', err));
@@ -288,6 +290,7 @@ exports.updateReferralStatus = async (req, res) => {
           to: referral.User.email,
           subject: rewardTemplate.subject,
           html: rewardTemplate.html,
+          tenantId: tenant.id,
           fromEmail,
           fromName
         });

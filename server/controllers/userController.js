@@ -284,6 +284,7 @@ exports.sendInvitations = async (req, res) => {
           to: client.email,
           subject: template.subject,
           html: template.html,
+          tenantId,
           fromEmail,
           fromName
         });

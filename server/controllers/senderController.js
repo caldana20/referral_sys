@@ -227,6 +227,7 @@ exports.sendTestEmail = async (req, res) => {
       to,
       subject: 'Test email from your tenant sender',
       html: `<p>This is a test email from ${record.fromName || 'your sender'}.</p>`,
+      tenantId,
       fromEmail: record.fromEmail,
       fromName: record.fromName
     });

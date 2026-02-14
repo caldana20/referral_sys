@@ -222,7 +222,7 @@ docker buildx inspect --bootstrap
 gcloud auth configure-docker us-west1-docker.pkg.dev
 
 docker buildx build --no-cache --platform  linux/amd64 \
-  -t us-west1-docker.pkg.dev/refoza/refoza/backend:v47 \
+  -t us-west1-docker.pkg.dev/refoza/refoza/backend:v48 \
   ./server --push
     
 docker buildx build --no-cache   --platform linux/amd64 \
@@ -230,12 +230,12 @@ docker buildx build --no-cache   --platform linux/amd64 \
   --build-arg "NEXT_PUBLIC_SITE_HOST=https://*.tenant.refoza.com" \
   --build-arg "NEXT_PUBLIC_BILLING_HOST=subscription.refoza.com" \
   --build-arg "NEXT_PUBLIC_TENANT_HOST_BASE=tenant.refoza.com" \
-  -t us-west1-docker.pkg.dev/refoza/refoza/frontend:v47 \
+  -t us-west1-docker.pkg.dev/refoza/refoza/frontend:v48 \
   ./next-app --push
 
 
-docker buildx imagetools inspect us-west1-docker.pkg.dev/refoza/refoza/backend:v47
-docker buildx imagetools inspect us-west1-docker.pkg.dev/refoza/refoza/frontend:v47
+docker buildx imagetools inspect us-west1-docker.pkg.dev/refoza/refoza/backend:v48
+docker buildx imagetools inspect us-west1-docker.pkg.dev/refoza/refoza/frontend:v48
 ```
 
 ## C) Update the deployments to the new tag
@@ -251,8 +251,8 @@ kubectl -n refoza apply -f k8s/frontend-deployment.yaml
 
 Option 2 (quick):
 ```
-kubectl -n refoza set image deployment/refoza-backend backend=us-west1-docker.pkg.dev/refoza/refoza/backend:v47
-kubectl -n refoza set image deployment/refoza-frontend frontend=us-west1-docker.pkg.dev/refoza/refoza/frontend:v47
+kubectl -n refoza set image deployment/refoza-backend backend=us-west1-docker.pkg.dev/refoza/refoza/backend:v48
+kubectl -n refoza set image deployment/refoza-frontend frontend=us-west1-docker.pkg.dev/refoza/refoza/frontend:v48
 ```
 
 ## D) Wait for rollout to complete
@@ -268,8 +268,8 @@ kubectl -n refoza get pods -l app=refoza-backend -o jsonpath='{range .items[*]}{
 ```
 Compare the digest with:
 ```
-docker buildx imagetools inspect us-west1-docker.pkg.dev/refoza/refoza/frontend:v47
-docker buildx imagetools inspect us-west1-docker.pkg.dev/refoza/refoza/backend:v47
+docker buildx imagetools inspect us-west1-docker.pkg.dev/refoza/refoza/frontend:v48
+docker buildx imagetools inspect us-west1-docker.pkg.dev/refoza/refoza/backend:v48
 ```
 
 ## E) Apply config/secret changes (if only env changed)
