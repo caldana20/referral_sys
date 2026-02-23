@@ -24,12 +24,20 @@ type Client = {
   email: string;
   phone?: string;
   role: string;
+  lastInvitationSentAt?: string | null;
 };
 
 type Campaign = { id: number; name: string };
 type Group = { id: number; name: string };
 
 const PAGE_SIZE = 10;
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString();
+}
 
 export default function AdminClientsPage() {
   const router = useRouter();
@@ -386,6 +394,7 @@ export default function AdminClientsPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Last invitation</TableHead>
                 <TableHead className="w-[220px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -406,6 +415,7 @@ export default function AdminClientsPage() {
                       {client.role}
                     </Badge>
                   </TableCell>
+                  <TableCell>{formatDateTime(client.lastInvitationSentAt)}</TableCell>
                   <TableCell className="space-y-2">
                     <div className="flex flex-wrap gap-2">
                       <Button variant="secondary" size="sm" onClick={() => handleGenerateLink(client.id)}>
@@ -444,7 +454,7 @@ export default function AdminClientsPage() {
               ))}
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                     {loading ? "Loading clients..." : "No clients found."}
                   </TableCell>
                 </TableRow>

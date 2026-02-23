@@ -14,6 +14,7 @@ const Group = require('./Group');
 const GroupMember = require('./GroupMember');
 const TenantEmailTemplate = require('./TenantEmailTemplate');
 const PasswordResetToken = require('./PasswordResetToken');
+const InvitationLog = require('./InvitationLog');
 
 // Tenant relationships
 Tenant.hasMany(User, { foreignKey: 'tenantId' });
@@ -49,6 +50,15 @@ Media.belongsTo(Tenant, { foreignKey: 'tenantId' });
 
 Tenant.hasMany(TenantEmailTemplate, { foreignKey: 'tenantId' });
 TenantEmailTemplate.belongsTo(Tenant, { foreignKey: 'tenantId' });
+
+Tenant.hasMany(InvitationLog, { foreignKey: 'tenantId' });
+InvitationLog.belongsTo(Tenant, { foreignKey: 'tenantId' });
+User.hasMany(InvitationLog, { foreignKey: 'userId' });
+InvitationLog.belongsTo(User, { foreignKey: 'userId' });
+Group.hasMany(InvitationLog, { foreignKey: 'groupId' });
+InvitationLog.belongsTo(Group, { foreignKey: 'groupId' });
+Campaign.hasMany(InvitationLog, { foreignKey: 'campaignId' });
+InvitationLog.belongsTo(Campaign, { foreignKey: 'campaignId' });
 
 // Products
 Tenant.hasMany(Product, { foreignKey: 'tenantId' });
@@ -103,7 +113,8 @@ const db = {
   Group,
   GroupMember,
   TenantEmailTemplate,
-  PasswordResetToken
+  PasswordResetToken,
+  InvitationLog
 };
 
 module.exports = db;

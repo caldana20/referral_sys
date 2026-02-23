@@ -23,7 +23,15 @@ type Group = {
   name: string;
   memberCount?: number;
   memberIds?: number[];
+  lastInvitationSentAt?: string | null;
 };
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "Never";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Never";
+  return date.toLocaleString();
+}
 
 export default function GroupsPage() {
   const router = useRouter();
@@ -192,6 +200,7 @@ export default function GroupsPage() {
                 <div>
                   <div className="font-medium text-slate-900">{group.name}</div>
                   <div className="text-sm text-slate-600">{group.memberCount ?? 0} members</div>
+                  <div className="text-xs text-slate-500">Last invitation: {formatDateTime(group.lastInvitationSentAt)}</div>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => openEdit(group)}>

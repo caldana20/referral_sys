@@ -18,6 +18,7 @@ type TenantSettings = {
   slug: string;
   logoUrl?: string | null;
   logoMediaId?: number | null;
+  estimateHeaderMediaId?: number | null;
   address?: string | null;
   city?: string | null;
   state?: string | null;
@@ -65,8 +66,12 @@ export default function TenantSettingsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoMediaId, setLogoMediaId] = useState<number | null>(null);
   const [logoClear, setLogoClear] = useState(false);
+  const [estimateHeaderMediaId, setEstimateHeaderMediaId] = useState<number | null>(null);
+  const [estimateHeaderPreview, setEstimateHeaderPreview] = useState<string | null>(null);
+  const [estimateHeaderClear, setEstimateHeaderClear] = useState(false);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [mediaDialogOpen, setMediaDialogOpen] = useState(false);
+  const [mediaDialogTarget, setMediaDialogTarget] = useState<"logo" | "estimateHeader">("logo");
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaLoaded, setMediaLoaded] = useState(false);
   const [sender, setSender] = useState<SenderInfo | null>(null);
@@ -102,17 +107,25 @@ export default function TenantSettingsPage() {
     }
   };
 
-  const openMediaDialog = () => {
+  const openMediaDialog = (target: "logo" | "estimateHeader") => {
+    setMediaDialogTarget(target);
     setMediaDialogOpen(true);
     if (!mediaLoaded) {
       loadMedia();
     }
   };
 
-  const handleSelectLogoMedia = (item: MediaItem) => {
-    setLogoMediaId(item.id);
-    setLogoPreview(item.signedUrl || item.url || null);
-    setLogoClear(false);
+  const handleSelectMedia = (item: MediaItem) => {
+    const selectedUrl = item.signedUrl || item.url || null;
+    if (mediaDialogTarget === "logo") {
+      setLogoMediaId(item.id);
+      setLogoPreview(selectedUrl);
+      setLogoClear(false);
+    } else {
+      setEstimateHeaderMediaId(item.id);
+      setEstimateHeaderPreview(selectedUrl);
+      setEstimateHeaderClear(false);
+    }
     setMediaDialogOpen(false);
   };
 
@@ -120,6 +133,12 @@ export default function TenantSettingsPage() {
     setLogoMediaId(null);
     setLogoPreview(null);
     setLogoClear(true);
+  };
+
+  const handleClearEstimateHeader = () => {
+    setEstimateHeaderMediaId(null);
+    setEstimateHeaderPreview(null);
+    setEstimateHeaderClear(true);
   };
 
   useEffect(() => {
@@ -214,7 +233,8 @@ export default function TenantSettingsPage() {
         setZip(res?.zip || "");
         setCountry(res?.country || "");
         setLogoMediaId(res?.logoMediaId ?? null);
-        if (res?.logoMediaId) {
+        setEstimateHeaderMediaId(res?.estimateHeaderMediaId ?? null);
+        if (res?.logoMediaId || res?.estimateHeaderMediaId) {
           try {
             const mediaRes = await apiFetch<MediaItem[]>("/api/media", {
               onUnauthorized: () => {
@@ -225,10 +245,10 @@ export default function TenantSettingsPage() {
             const list = Array.isArray(mediaRes) ? mediaRes : [];
             setMediaItems(list);
             setMediaLoaded(true);
-            const match = list.find((m) => m.id === res.logoMediaId);
-            if (match) {
-              setLogoPreview(match.signedUrl || match.url || null);
-            }
+            const logoMatch = list.find((m) => m.id === res.logoMediaId);
+            if (logoMatch) setLogoPreview(logoMatch.signedUrl || logoMatch.url || null);
+            const headerMatch = list.find((m) => m.id === res.estimateHeaderMediaId);
+            if (headerMatch) setEstimateHeaderPreview(headerMatch.signedUrl || headerMatch.url || null);
           } catch (err) {
             toast.error(err instanceof Error ? err.message : "Failed to load logo media");
           }
@@ -266,6 +286,11 @@ export default function TenantSettingsPage() {
     } else if (logoClear) {
       formData.append("logoMediaId", "");
     }
+    if (estimateHeaderMediaId !== null) {
+      formData.append("estimateHeaderMediaId", String(estimateHeaderMediaId));
+    } else if (estimateHeaderClear) {
+      formData.append("estimateHeaderMediaId", "");
+    }
 
     setSaving(true);
     try {
@@ -284,8 +309,11 @@ export default function TenantSettingsPage() {
       setZip(res?.zip || "");
       setCountry(res?.country || "");
       setLogoMediaId(res?.logoMediaId ?? null);
+      setEstimateHeaderMediaId(res?.estimateHeaderMediaId ?? null);
       setLogoPreview(null);
+      setEstimateHeaderPreview(null);
       setLogoClear(false);
+      setEstimateHeaderClear(false);
       toast.success("Settings updated");
     } catch (err: unknown) {
       const status = (err as { status?: number }).status;
@@ -399,6 +427,8 @@ export default function TenantSettingsPage() {
 
   const selectedLogoMedia = logoMediaId ? mediaItems.find((m) => m.id === logoMediaId) : null;
   const logoDisplay = logoPreview || selectedLogoMedia?.signedUrl || selectedLogoMedia?.url || settings?.logoUrl || null;
+  const selectedEstimateHeaderMedia = estimateHeaderMediaId ? mediaItems.find((m) => m.id === estimateHeaderMediaId) : null;
+  const estimateHeaderDisplay = estimateHeaderPreview || selectedEstimateHeaderMedia?.signedUrl || selectedEstimateHeaderMedia?.url || null;
 
   return (
     <div className="space-y-6">
@@ -494,7 +524,7 @@ export default function TenantSettingsPage() {
             <p className="text-sm text-slate-500">No logo selected.</p>
           )}
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={openMediaDialog}>
+            <Button type="button" variant="outline" onClick={() => openMediaDialog("logo")}>
               Choose from media
             </Button>
             {(settings?.logoUrl || logoMediaId || logoPreview) && (
@@ -502,6 +532,28 @@ export default function TenantSettingsPage() {
                 Remove logo
               </Button>
             )}
+          </div>
+          <div className="space-y-2">
+            <Label>Estimate Header Image (horizontal)</Label>
+            {estimateHeaderDisplay ? (
+              <img
+                src={estimateHeaderDisplay}
+                alt="Estimate form header"
+                className="h-28 w-full rounded border object-cover"
+              />
+            ) : (
+              <p className="text-sm text-slate-500">No estimate header image selected.</p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => openMediaDialog("estimateHeader")}>
+                Choose from media
+              </Button>
+              {(estimateHeaderMediaId || estimateHeaderPreview) && (
+                <Button type="button" variant="ghost" onClick={handleClearEstimateHeader}>
+                  Remove estimate header image
+                </Button>
+              )}
+            </div>
           </div>
           <Button onClick={handleSave} disabled={saving || !name.trim()}>
             {saving ? "Saving..." : "Save"}
@@ -575,7 +627,9 @@ export default function TenantSettingsPage() {
       <Dialog open={mediaDialogOpen} onOpenChange={setMediaDialogOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Select logo image</DialogTitle>
+            <DialogTitle>
+              {mediaDialogTarget === "logo" ? "Select logo image" : "Select estimate header image"}
+            </DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-between pb-2">
             <div className="text-sm text-slate-600">Choose an image from the media gallery.</div>
@@ -594,7 +648,7 @@ export default function TenantSettingsPage() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => handleSelectLogoMedia(item)}
+                    onClick={() => handleSelectMedia(item)}
                     className="group rounded border bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow"
                   >
                     <div className="aspect-square w-full overflow-hidden border-b bg-slate-100">

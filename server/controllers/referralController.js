@@ -1,7 +1,8 @@
-const { Referral, User, Estimate, Tenant, TenantHost } = require('../models');
+const { Referral, User, Estimate, Tenant, TenantHost, Media } = require('../models');
 const crypto = require('crypto');
 const { sendEmail } = require('../utils/emailService');
 const { getFieldsForTenant } = require('../config/tenantFields');
+const { getSignedReadUrl } = require('../utils/storage');
 
 async function getPrimaryHost(tenantId) {
   const host = await TenantHost.findOne({
@@ -358,6 +359,16 @@ exports.getReferralByCode = async (req, res) => {
     name: tenant.name,
     logoUrl: tenant.logoUrl || null
   };
+  if (tenant.estimateHeaderMediaId) {
+    const headerMedia = await Media.findOne({
+      where: { id: tenant.estimateHeaderMediaId, tenantId: tenant.id }
+    });
+    referralData.tenant.estimateHeaderImageUrl = headerMedia
+      ? (await getSignedReadUrl(headerMedia.key)) || headerMedia.url
+      : null;
+  } else {
+    referralData.tenant.estimateHeaderImageUrl = null;
+  }
   if (referral.Campaign) {
     referralData.campaign = { id: referral.Campaign.id, name: referral.Campaign.name };
   }

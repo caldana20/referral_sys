@@ -2,31 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api-client";
-
-type FieldConfig = {
-  id: string;
-  label: string;
-  type: "text" | "textarea" | "email" | "number" | "select" | "date" | "checkbox";
-  required?: boolean;
-  options?: string[];
-  span?: 1 | 2;
-  placeholder?: string;
-  rows?: number;
-  helpText?: string;
-};
+import { EstimateRequestForm, type EstimateFieldConfig } from "@/components/estimate/estimate-request-form";
 
 type ReferralResponse = {
   code: string;
   used?: boolean;
-  fieldConfig?: FieldConfig[];
-  tenant?: { name?: string; logoUrl?: string | null };
+  fieldConfig?: EstimateFieldConfig[];
+  tenant?: { name?: string; logoUrl?: string | null; estimateHeaderImageUrl?: string | null };
 };
 
 export default function ReferralLandingPage() {
@@ -109,66 +92,6 @@ export default function ReferralLandingPage() {
   if (loading) return <div className="text-center p-10">Loading...</div>;
   if (valid === false) return <div className="text-center p-10 text-red-600 text-xl">Invalid or expired referral link.</div>;
 
-  const renderField = (field: FieldConfig) => {
-    const value = customFields[field.id] ?? "";
-    const commonProps = {
-      id: field.id,
-      name: field.id,
-      required: field.required,
-      value,
-      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-        setCustomFields({ ...customFields, [field.id]: e.target.value }),
-      placeholder: field.placeholder,
-    };
-    switch (field.type) {
-      case "textarea":
-        return <Textarea {...commonProps} rows={field.rows ?? 3} />;
-      case "select":
-        return (
-          <Select
-            value={value}
-            onValueChange={(val) => setCustomFields({ ...customFields, [field.id]: val })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select an option" />
-            </SelectTrigger>
-            <SelectContent>
-              {(field.options || []).map((opt) => (
-                <SelectItem key={opt} value={opt}>
-                  {opt}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
-      case "date":
-        return <Input type="date" {...commonProps} className="max-w-xs" />;
-      case "checkbox":
-        return (
-          <div className="flex items-center gap-2">
-            <input
-              id={field.id}
-              name={field.id}
-              type="checkbox"
-              checked={value === "true"}
-              onChange={(e) => setCustomFields({ ...customFields, [field.id]: e.target.checked ? "true" : "false" })}
-            />
-            <Label htmlFor={field.id} className="text-sm font-normal">
-              {field.label}
-            </Label>
-          </div>
-        );
-      case "email":
-        return <Input type="email" {...commonProps} />;
-      case "number":
-        return <Input type="number" {...commonProps} />;
-      default:
-        return <Input type="text" {...commonProps} />;
-    }
-  };
-
-  const hasCustomNotes = referralData?.fieldConfig?.some((f) => f.id === "notes");
-
   return (
     <div className="min-h-screen bg-white px-6 py-10">
       <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -191,115 +114,19 @@ export default function ReferralLandingPage() {
             <p className="text-slate-600">Thank you! We will contact you shortly for your estimate.</p>
           </div>
         ) : (
-          <>
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <section className="space-y-3">
-                <h2 className="text-lg font-semibold text-slate-900">Contact</h2>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-1 md:col-span-2">
-                    <Label className="mb-1 block">Full Name</Label>
-                    <Input
-                      required
-                      name="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="mb-1 block">Email</Label>
-                    <Input
-                      required
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="mb-1 block">Phone</Label>
-                    <Input
-                      name="phone"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="mb-1 block">Address</Label>
-                    <Input
-                      name="address"
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="mb-1 block">City</Label>
-                    <Input
-                      name="city"
-                      value={formData.city}
-                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-3">
-                <h2 className="text-lg font-semibold text-slate-900">Project</h2>
-                <div className="space-y-1">
-                  <Label className="mb-1 block">Project Description</Label>
-                  <Textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Describe your project requirements..."
-                    rows={4}
-                  />
-                </div>
-              </section>
-
-              {referralData?.fieldConfig?.length ? (
-                <section className="space-y-3">
-                  <h2 className="text-lg font-semibold text-slate-900">Additional Details</h2>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {referralData.fieldConfig.map((field) => (
-                      <div key={field.id} className={`space-y-1 ${field.span === 2 ? "md:col-span-2" : ""}`}>
-                        <Label htmlFor={field.id}>
-                          {field.label} {field.required ? "*" : ""}
-                        </Label>
-                        {renderField(field)}
-                        {field.helpText ? (
-                          <p className="text-xs text-slate-500">{field.helpText}</p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              {!hasCustomNotes && (
-                <section className="space-y-3">
-                  <h2 className="text-lg font-semibold text-slate-900">Notes</h2>
-                  <Textarea
-                    name="notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Additional notes"
-                    rows={3}
-                  />
-                </section>
-              )}
-
-              <Button type="submit" className="w-full">
-                Submit Request
-              </Button>
-            </form>
-          </>
+          <EstimateRequestForm
+            fieldConfig={referralData?.fieldConfig || []}
+            formData={formData}
+            setFormData={setFormData}
+            customFields={customFields}
+            setCustomFields={setCustomFields}
+            onSubmit={handleSubmit}
+            error={error}
+            headerImageUrl={referralData?.tenant?.estimateHeaderImageUrl || null}
+            headerImageAlt={`${referralData?.tenant?.name || "Tenant"} estimate header`}
+            descriptionRequired={false}
+            hideNotesWhenCustomNotes
+          />
         )}
       </div>
     </div>

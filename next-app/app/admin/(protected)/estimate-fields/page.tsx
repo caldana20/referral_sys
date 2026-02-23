@@ -9,17 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/components/providers/auth-provider";
 import { toast } from "sonner";
+import { EstimateRequestForm, type EstimateFieldConfig, type EstimateFormData } from "@/components/estimate/estimate-request-form";
 
-type FieldConfig = {
-  id: string;
-  label: string;
-  type: string;
-  required?: boolean;
-  options?: string[];
-};
+type FieldConfig = EstimateFieldConfig;
+type TenantSettingsPreview = { estimateHeaderMediaId?: number | null };
+type MediaItem = { id: number; signedUrl?: string | null; url: string };
 
 export default function EstimateFieldsPage() {
   const router = useRouter();
@@ -35,6 +33,19 @@ export default function EstimateFieldsPage() {
     optionsText: "",
   });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFormData, setPreviewFormData] = useState<EstimateFormData>({
+    name: "Jane Prospect",
+    email: "jane@example.com",
+    phone: "(555) 010-1111",
+    address: "123 Main St",
+    city: "Seattle",
+    description: "Preview project details",
+    notes: "Preview notes"
+  });
+  const [previewCustomFields, setPreviewCustomFields] = useState<Record<string, string>>({});
+  const [previewHeaderImageUrl, setPreviewHeaderImageUrl] = useState<string | null>(null);
+  const [previewHeaderLoading, setPreviewHeaderLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -142,6 +153,57 @@ export default function EstimateFieldsPage() {
     setFields(next);
   };
 
+  useEffect(() => {
+    const currentFields = fields || [];
+    setPreviewCustomFields((prev) => {
+      const next = { ...prev };
+      for (const field of currentFields) {
+        if (next[field.id] === undefined) next[field.id] = "";
+      }
+      for (const key of Object.keys(next)) {
+        if (!currentFields.some((field) => field.id === key)) {
+          delete next[key];
+        }
+      }
+      return next;
+    });
+  }, [fields]);
+
+  useEffect(() => {
+    const loadPreviewHeader = async () => {
+      if (!previewOpen) return;
+      setPreviewHeaderLoading(true);
+      try {
+        const settings = await apiFetch<TenantSettingsPreview>("/api/tenants/settings", {
+          onUnauthorized: () => {
+            logout();
+            router.replace("/admin/login");
+          }
+        });
+        const mediaId = settings?.estimateHeaderMediaId;
+        if (!mediaId) {
+          setPreviewHeaderImageUrl(null);
+          return;
+        }
+        const media = await apiFetch<MediaItem[]>("/api/media", {
+          onUnauthorized: () => {
+            logout();
+            router.replace("/admin/login");
+          }
+        });
+        const selected = Array.isArray(media) ? media.find((item) => item.id === mediaId) : null;
+        setPreviewHeaderImageUrl(selected?.signedUrl || selected?.url || null);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to load preview header image";
+        toast.error(message);
+        setPreviewHeaderImageUrl(null);
+      } finally {
+        setPreviewHeaderLoading(false);
+      }
+    };
+    loadPreviewHeader();
+  }, [previewOpen, logout, router]);
+
   const handleSaveFields = async () => {
     try {
       await apiFetch("/api/tenants/fields", {
@@ -160,6 +222,7 @@ export default function EstimateFieldsPage() {
   };
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Estimate Fields</CardTitle>
@@ -170,9 +233,14 @@ export default function EstimateFieldsPage() {
           <div>
             <p className="text-sm text-slate-600">Create, edit, and remove fields per tenant.</p>
           </div>
-          <Button variant="outline" size="sm" onClick={handleSaveFields} disabled={fieldsLoading}>
-            Save Fields
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)} disabled={fieldsLoading}>
+              Preview Form
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleSaveFields} disabled={fieldsLoading}>
+              Save Fields
+            </Button>
+          </div>
         </div>
 
         <Separator />
@@ -297,6 +365,30 @@ export default function EstimateFieldsPage() {
         </div>
       </CardContent>
     </Card>
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Estimate Form Preview</DialogTitle>
+          </DialogHeader>
+          <div className="rounded-md border p-4">
+            {previewHeaderLoading ? (
+              <p className="mb-3 text-sm text-slate-500">Loading header image...</p>
+            ) : null}
+            <EstimateRequestForm
+              fieldConfig={fields || []}
+              formData={previewFormData}
+              setFormData={setPreviewFormData}
+              customFields={previewCustomFields}
+              setCustomFields={setPreviewCustomFields}
+              headerImageUrl={previewHeaderImageUrl}
+              readOnly
+              descriptionRequired={false}
+              hideNotesWhenCustomNotes
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

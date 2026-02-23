@@ -1,9 +1,10 @@
-const { User, Tenant, TenantHost } = require('../models');
+const { User, Tenant, TenantHost, InvitationLog } = require('../models');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const csv = require('csv-parser');
 const { sendEmail } = require('../utils/emailService');
 const jwt = require('jsonwebtoken');
+const { fn, col } = require('sequelize');
 
 // Get all users (admins and clients)
 exports.getUsers = async (req, res) => {
@@ -16,7 +17,36 @@ exports.getUsers = async (req, res) => {
       where: whereClause,
       attributes: { exclude: ['password_hash'] }
     });
-    res.json(users);
+    const clientIds = users
+      .filter((u) => u.role === 'client')
+      .map((u) => u.id);
+
+    let lastInviteByClientId = new Map();
+    if (clientIds.length > 0) {
+      const rows = await InvitationLog.findAll({
+        where: {
+          tenantId: req.user.tenantId,
+          targetType: 'client',
+          userId: clientIds
+        },
+        attributes: ['userId', [fn('MAX', col('sentAt')), 'lastInvitationSentAt']],
+        group: ['userId'],
+        raw: true
+      });
+      lastInviteByClientId = new Map(
+        rows.map((row) => [Number(row.userId), row.lastInvitationSentAt || null])
+      );
+    }
+
+    const payload = users.map((user) => {
+      const item = user.toJSON();
+      if (item.role === 'client') {
+        item.lastInvitationSentAt = lastInviteByClientId.get(item.id) || null;
+      }
+      return item;
+    });
+
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -240,6 +270,8 @@ exports.sendInvitations = async (req, res) => {
       if (!campaign) return res.status(400).json({ message: 'Invalid campaignId' });
       campaignName = campaign.name || null;
     }
+    const parsedCampaignId = campaignId ? Number(campaignId) : null;
+    const safeCampaignId = Number.isFinite(parsedCampaignId) ? parsedCampaignId : null;
     const tenantSender = await require('./senderController').resolveTenantSender(tenantId);
     const fromEmail = tenantSender?.fromEmail || process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER;
     const fromName = tenantSender?.fromName || companyName;
@@ -250,6 +282,8 @@ exports.sendInvitations = async (req, res) => {
 
     let sentCount = 0;
     let failedCount = 0;
+
+    const sentAt = new Date();
 
     // Send emails to each client with their personalized link
     for (const client of clients) {
@@ -289,11 +323,31 @@ exports.sendInvitations = async (req, res) => {
           fromName
         });
 
+        await InvitationLog.create({
+          tenantId,
+          targetType: 'client',
+          userId: client.id,
+          campaignId: safeCampaignId,
+          sentAt
+        });
+
         sentCount++;
       } catch (emailError) {
         console.error(`Failed to send email to ${client.email}:`, emailError);
         failedCount++;
       }
+    }
+
+    const parsedGroupId = groupId ? Number(groupId) : null;
+    const safeGroupId = Number.isFinite(parsedGroupId) ? parsedGroupId : null;
+    if (safeGroupId && sentCount > 0) {
+      await InvitationLog.create({
+        tenantId,
+        targetType: 'group',
+        groupId: safeGroupId,
+        campaignId: safeCampaignId,
+        sentAt
+      });
     }
 
     res.json({

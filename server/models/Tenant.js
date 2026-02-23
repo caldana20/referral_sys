@@ -63,6 +63,10 @@ const Tenant = sequelize.define('Tenant', {
     type: DataTypes.INTEGER,
     allowNull: true
   },
+  estimateHeaderMediaId: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
   estimateFieldConfig: {
     // JSON array of field definitions per tenant
     type: DataTypes.JSON,

@@ -108,8 +108,6 @@ exports.sendEmail = async ({ to, subject, html, fromEmail, fromName, tenantId, u
       html: appendFooterHtml(html, footerData)
     };
 
-    console.info('SendGrid mail payload:', msg);
-
     const result = await sgMail.send(msg);
     
     // Log success

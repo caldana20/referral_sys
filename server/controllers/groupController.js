@@ -1,4 +1,5 @@
-const { Group, GroupMember, User } = require('../models');
+const { Group, GroupMember, User, InvitationLog } = require('../models');
+const { fn, col } = require('sequelize');
 
 exports.list = async (req, res) => {
   try {
@@ -8,10 +9,28 @@ exports.list = async (req, res) => {
       order: [['name', 'ASC']],
       include: [{ model: User, attributes: ['id'], through: { attributes: [] } }]
     });
+    const groupIds = groups.map((g) => g.id);
+    let lastInviteByGroupId = new Map();
+    if (groupIds.length > 0) {
+      const rows = await InvitationLog.findAll({
+        where: {
+          tenantId,
+          targetType: 'group',
+          groupId: groupIds
+        },
+        attributes: ['groupId', [fn('MAX', col('sentAt')), 'lastInvitationSentAt']],
+        group: ['groupId'],
+        raw: true
+      });
+      lastInviteByGroupId = new Map(
+        rows.map((row) => [Number(row.groupId), row.lastInvitationSentAt || null])
+      );
+    }
     const payload = groups.map((g) => ({
       id: g.id,
       name: g.name,
-      memberCount: Array.isArray(g.Users) ? g.Users.length : 0
+      memberCount: Array.isArray(g.Users) ? g.Users.length : 0,
+      lastInvitationSentAt: lastInviteByGroupId.get(g.id) || null
     }));
     res.json(payload);
   } catch (err) {
@@ -27,10 +46,15 @@ exports.get = async (req, res) => {
       include: [{ model: User, attributes: ['id'], through: { attributes: [] } }]
     });
     if (!group) return res.status(404).json({ message: 'Group not found' });
+    const lastGroupInvite = await InvitationLog.findOne({
+      where: { tenantId, targetType: 'group', groupId: group.id },
+      order: [['sentAt', 'DESC']]
+    });
     res.json({
       id: group.id,
       name: group.name,
-      memberIds: Array.isArray(group.Users) ? group.Users.map((u) => u.id) : []
+      memberIds: Array.isArray(group.Users) ? group.Users.map((u) => u.id) : [],
+      lastInvitationSentAt: lastGroupInvite?.sentAt || null
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to load group', error: err.message });

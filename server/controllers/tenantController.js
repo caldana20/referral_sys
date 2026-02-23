@@ -165,6 +165,7 @@ exports.getSettings = async (req, res) => {
       slug: tenant.slug,
       logoUrl: tenant.logoUrl,
       logoMediaId: tenant.logoMediaId,
+      estimateHeaderMediaId: tenant.estimateHeaderMediaId,
       address: tenant.address,
       city: tenant.city,
       state: tenant.state,
@@ -191,7 +192,7 @@ exports.updateSettings = async (req, res) => {
     const tenant = await Tenant.findByPk(req.user.tenantId);
     if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
 
-    const { name, address, city, state, zip, country, logoMediaId } = req.body;
+    const { name, address, city, state, zip, country, logoMediaId, estimateHeaderMediaId } = req.body;
     console.info('updateSettings payload:', {
       tenantId: req.user.tenantId,
       name,
@@ -200,7 +201,8 @@ exports.updateSettings = async (req, res) => {
       state,
       zip,
       country,
-      logoMediaId
+      logoMediaId,
+      estimateHeaderMediaId
     });
     if (name && name.trim() === '') {
       return res.status(400).json({ message: 'Name cannot be empty' });
@@ -246,6 +248,20 @@ exports.updateSettings = async (req, res) => {
       }
     }
 
+    if (estimateHeaderMediaId !== undefined) {
+      if (estimateHeaderMediaId === null || estimateHeaderMediaId === '') {
+        tenant.estimateHeaderMediaId = null;
+      } else {
+        const mediaId = Number(estimateHeaderMediaId);
+        if (!Number.isFinite(mediaId)) {
+          return res.status(400).json({ message: 'estimateHeaderMediaId must be a number' });
+        }
+        const media = await Media.findOne({ where: { id: mediaId, tenantId: req.user.tenantId } });
+        if (!media) return res.status(400).json({ message: 'Estimate header image not found for tenant' });
+        tenant.estimateHeaderMediaId = media.id;
+      }
+    }
+
     if (req.file) {
       const filePath = req.file.path.replace(/\\/g, '/');
       const publicUrl = `${req.protocol}://${req.get('host')}/${filePath}`;
@@ -269,6 +285,7 @@ exports.updateSettings = async (req, res) => {
       slug: tenant.slug,
       logoUrl: tenant.logoUrl,
       logoMediaId: tenant.logoMediaId,
+      estimateHeaderMediaId: tenant.estimateHeaderMediaId,
       address: tenant.address,
       city: tenant.city,
       state: tenant.state,
