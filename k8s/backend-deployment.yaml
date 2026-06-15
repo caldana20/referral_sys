@@ -16,7 +16,7 @@ spec:
       serviceAccountName: refoza-backend-sa
       containers:
         - name: backend
-          image: us-west1-docker.pkg.dev/refoza/refoza/backend:v48
+          image: us-west1-docker.pkg.dev/refoza/refoza/backend:v49
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000

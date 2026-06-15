@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: us-west1-docker.pkg.dev/refoza/refoza/frontend:v48
+          image: us-west1-docker.pkg.dev/refoza/refoza/frontend:v49
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
