@@ -267,7 +267,12 @@ export default function EstimateFieldsPage() {
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>Type</Label>
-                <Select value={fieldDraft.type} onValueChange={(v) => setFieldDraft((d) => ({ ...d, type: v }))}>
+                <Select
+                  value={fieldDraft.type}
+                  onValueChange={(v) =>
+                    setFieldDraft((d) => ({ ...d, type: v as EstimateFieldConfig["type"] }))
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
